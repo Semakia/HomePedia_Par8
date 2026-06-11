@@ -1,0 +1,128 @@
+# =============================================================================
+# HOMEPEDIA - Task runner (https://taskfile.dev)
+# -----------------------------------------------------------------------------
+# `task --list` to see commands. Wraps the docker compose dev stack so day-to-day
+# commands stay short and consistent across the team.
+# =============================================================================
+version: "3"
+
+vars:
+  # `.env` is auto-loaded by Compose from the working dir (repo root), so no
+  # explicit --env-file flag (it isn't a global flag on older Compose v2).
+  DEV: docker compose -f iac/docker/dev/docker-compose.yml
+  AIRFLOW: docker compose -f iac/docker/dev/airflow/docker-compose.yml
+  # --env-file isolates OpenMetadata from the repo-root .env (whose HOMEPEDIA
+  # vars collide with OM's own substitutions). The dedicated file is empty.
+  OPENMETADATA: docker compose --env-file iac/docker/dev/openmetadata/.env -f iac/docker/dev/openmetadata/docker-compose.yml
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  init:
+    desc: "Bootstrap local env (.env from template)"
+    cmds:
+      - cmd: powershell -Command "if (-not (Test-Path .env)) { Copy-Item .env.dist .env; Write-Host '.env created from .env.dist' } else { Write-Host '.env already exists' }"
+        platforms: [windows]
+      - cmd: '[ -f .env ] && echo ".env already exists" || (cp .env.dist .env && echo ".env created from .env.dist")'
+        platforms: [linux, darwin]
+
+  up:
+    desc: "Start the dev data plane (minio, postgres, redis, spark, api)"
+    deps: [init]
+    cmds:
+      - "{{.DEV}} up -d --build"
+      - 'echo "API     -> http://localhost:8000/docs"'
+      - 'echo "MinIO   -> http://localhost:9001 (console)"'
+      - 'echo "Spark   -> http://localhost:8090"'
+
+  down:
+    desc: "Stop the dev data plane (keep volumes)"
+    cmds:
+      - "{{.DEV}} down"
+
+  nuke:
+    desc: "Stop and DELETE all volumes (fresh state)"
+    cmds:
+      - "{{.DEV}} down -v"
+      - "{{.AIRFLOW}} down -v"
+
+  ps:
+    desc: "Show running services"
+    cmds:
+      - "{{.DEV}} ps"
+
+  logs:
+    desc: "Tail logs (task logs -- api)"
+    cmds:
+      - "{{.DEV}} logs -f {{.CLI_ARGS}}"
+
+  config:
+    desc: "Validate & render the merged compose config"
+    cmds:
+      - "{{.DEV}} config -q && echo 'dev compose OK'"
+      - "{{.AIRFLOW}} config -q && echo 'airflow compose OK'"
+
+  airflow:up:
+    desc: "Start Airflow (requires `task up` first)"
+    deps: [init]
+    cmds:
+      - "{{.AIRFLOW}} up -d"
+      - 'echo "Airflow -> http://localhost:8080 (admin/admin)"'
+
+  airflow:down:
+    desc: "Stop Airflow"
+    cmds:
+      - "{{.AIRFLOW}} down"
+
+  # The repo .env is exported in the shell and its AIRFLOW_DB* (=airflow) would
+  # otherwise override OpenMetadata's ingestion DB creds (it expects airflow_user
+  # /airflow_pass/airflow_db). Pin them per-task — NOT globally, or our own
+  # Airflow (which uses AIRFLOW_DB=airflow) would break.
+  openmetadata:up:
+    desc: "Start OpenMetadata catalog (needs ~6GB free RAM in Docker)"
+    env:
+      AIRFLOW_DB: airflow_db
+      AIRFLOW_DB_USER: airflow_user
+      AIRFLOW_DB_PASSWORD: airflow_pass
+    cmds:
+      - "{{.OPENMETADATA}} up -d"
+      - 'echo "OpenMetadata -> http://localhost:8585 (admin@open-metadata.org / admin)"'
+      - 'echo "OM Ingestion (Airflow) -> http://localhost:8081 (admin/admin)"'
+
+  openmetadata:down:
+    desc: "Stop OpenMetadata (add -- -v to wipe volumes)"
+    env:
+      AIRFLOW_DB: airflow_db
+      AIRFLOW_DB_USER: airflow_user
+      AIRFLOW_DB_PASSWORD: airflow_pass
+    cmds:
+      - "{{.OPENMETADATA}} down {{.CLI_ARGS}}"
+
+  openmetadata:logs:
+    desc: "Tail OpenMetadata logs (task openmetadata:logs -- openmetadata-server)"
+    cmds:
+      - "{{.OPENMETADATA}} logs -f {{.CLI_ARGS}}"
+
+  test:
+    desc: "Run the test suite"
+    cmds:
+      - python -m pytest tests/ {{.CLI_ARGS}}
+
+  lint:
+    desc: "Lint with ruff"
+    cmds:
+      - python -m ruff check src tests
+
+  fmt:
+    desc: "Format with black + ruff --fix"
+    cmds:
+      - python -m black src tests
+      - python -m ruff check --fix src tests
+
+  buckets:
+    desc: "(Re)create medallion S3 buckets against MinIO"
+    cmds:
+      - bash iac/scripts/create_s3_buckets.sh
