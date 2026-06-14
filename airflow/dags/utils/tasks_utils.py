@@ -66,7 +66,9 @@ class HomepediaETLTasks:
         """
         params = context["params"]
         requested_year = int(params["year"])
-        # Melodi API contains data up to 2022. Fallback to 2022 if a later year is requested.
+        # INSEE Melodi RP cube only serves 2011/2016/2022; 2022 is the latest
+        # population vintage. Cap the request so a recent DVF year (e.g. 2024)
+        # still lands the most recent INSEE data available.
         year = min(requested_year, 2022)
         requested = [str(d) for d in (params.get("departements") or [])]
         departements = requested or self.load_departements()
@@ -89,9 +91,40 @@ class HomepediaETLTasks:
         )
         return {"year": year, "objects": results}
 
-    # downstream (stubs)
-    def silver_to_gold(self, **_) -> None:
-        self.logger.info("[gold] would load Silver -> Gold (Postgres). Stub for now.")
+    def ingest_filosofi(self, **context) -> dict:
+        """Land INSEE FiLoSoFi income files into Bronze S3 for each departement.
 
+        Idempotent: the connector skips objects already present (no overwrite).
+        Returns a summary pushed to XCom.
+        """
+        params = context["params"]
+        requested_year = int(params["year"])
+        # FiLoSoFi commune vintage caps at 2023 (published with a lag). Cap the
+        # request so a recent DVF year still lands the latest income data.
+        year = min(requested_year, 2023)
+        requested = [str(d) for d in (params.get("departements") or [])]
+        departements = requested or self.load_departements()
+
+        from src.data_ingestion.sources.filosofi_connector import FilosofiConnector
+
+        connector = FilosofiConnector()
+        results: list[dict] = []
+        for dep in departements:
+            results.append(connector.ingest(year=year, departement=dep))
+
+        landed = [r for r in results if not r.get("skipped")]
+        self.logger.info(
+            "filosofi.ingest.summary",
+            year=year,
+            requested=len(results),
+            landed=len(landed),
+            skipped=len(results) - len(landed),
+        )
+        return {"year": year, "objects": results}
+
+    # downstream (stubs)
+    # NB: silver_to_gold is NOT here — it runs as a Spark JDBC job inside the
+    # spark-master container (BashOperator docker exec in the DAG), since it
+    # needs the Spark runtime + Postgres driver baked into the spark image.
     def refresh_cache(self, **_) -> None:
         self.logger.info("[cache] would warm Redis pre-computed views. Stub for now.")

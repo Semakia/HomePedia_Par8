@@ -3,8 +3,9 @@
 Pipeline: ingest -> bronze_to_silver -> silver_to_gold -> quality_checks -> refresh_cache
 
 Task callables live in utils/tasks_utils.py; this module declares only the
-variables and wires the DAG. DVF ingestion + Bronze->Silver Spark are real;
-Gold/quality/cache and INSEE ingestion are still stubs.
+variables and wires the DAG. DVF + INSEE + FiLoSoFi ingestion, Bronze->Silver
+(the three sources), Silver->Gold and quality_checks are all real (Spark via
+docker exec). Only refresh_cache is still a stub.
 
 Trigger with config, e.g. { "year": 2024, "departements": ["75", "69"] }.
 Default (empty `departements`) ingests every code in utils/departements.json.
@@ -34,6 +35,8 @@ DEFAULT_ARGS = {
 SPARK_CONTAINER = "homepedia-dev-spark-master"
 SILVER_DVF_APP = "/opt/homepedia/src/data_processing/transformations/housing_dvf_etl.py"
 SILVER_INSEE_APP = "/opt/homepedia/src/data_processing/transformations/insee_etl.py"
+SILVER_FILOSOFI_APP = "/opt/homepedia/src/data_processing/transformations/filosofi_etl.py"
+GOLD_APP = "/opt/homepedia/src/data_processing/transformations/silver_to_gold.py"
 QUALITY_APP = "/opt/homepedia/src/data_governance/quality/data_quality_reporter.py"
 
 # Task callables grouped in one object; bound methods are passed to the operators.
@@ -41,13 +44,13 @@ tasks = HomepediaETLTasks()
 
 
 with DAG(
-    dag_id="homepedia_etl",
+    dag_id="housing_etl",
     description="Main HOMEPEDIA batch pipeline (Bronze -> Silver -> Gold).",
     default_args=DEFAULT_ARGS,
     schedule="0 2 * * *",  # daily at 02:00
     start_date=datetime(2025, 1, 1),
     catchup=False,
-    tags=["homepedia", "etl"],
+    tags=["housing", "etl"],
     params={
         "year": Param(2024, type="integer", minimum=2014, maximum=2100),
         # Nullable so the UI field is OPTIONAL (no red asterisk / no "required").
@@ -72,6 +75,11 @@ with DAG(
         python_callable=tasks.ingest_insee,
     )
 
+    ingest_from_filosofi = PythonOperator(
+        task_id="ingest_from_filosofi",
+        python_callable=tasks.ingest_filosofi,
+    )
+
     # Spark job: clean DVF Bronze -> Silver Parquet for the whole year
     bronze_to_silver_dvf = BashOperator(
         task_id="bronze_to_silver_dvf",
@@ -92,9 +100,27 @@ with DAG(
         ),
     )
 
-    silver_to_gold = PythonOperator(
+    # Spark job: clean FiLoSoFi Bronze -> Silver Parquet (income caps at 2023).
+    bronze_to_silver_filosofi = BashOperator(
+        task_id="bronze_to_silver_filosofi",
+        bash_command=(
+            f"docker exec {SPARK_CONTAINER} bash -c "
+            f"\"spark-submit --master 'local[*]' {SILVER_FILOSOFI_APP} "
+            "--year {{ params.year }}\""
+        ),
+    )
+
+    # Spark JDBC job: join DVF x INSEE x FiLoSoFi Silver -> 3 Gold tables.
+    # Runs in spark-master (Postgres driver baked in the image); POSTGRES_* come
+    # from the container's .env (env_file), pointing at the remote Gold DB.
+    silver_to_gold = BashOperator(
         task_id="silver_to_gold",
-        python_callable=tasks.silver_to_gold,
+        bash_command=(
+            f"docker exec {SPARK_CONTAINER} bash -c "
+            f"\"spark-submit --master 'local[*]' "
+            f"--conf spark.driver.memory=1g "
+            f"--conf spark.sql.shuffle.partitions=8 {GOLD_APP}\""
+        ),
     )
 
     # Data-quality gate on the Silver layer (fails the task if a critical rule
@@ -115,7 +141,12 @@ with DAG(
     end = EmptyOperator(task_id="end")
 
     # Wire DAG dependencies
-    start >> [ingest_from_dvf, ingest_from_insee]
+    start >> [ingest_from_dvf, ingest_from_insee, ingest_from_filosofi]
     ingest_from_dvf >> bronze_to_silver_dvf
     ingest_from_insee >> bronze_to_silver_insee
-    [bronze_to_silver_dvf, bronze_to_silver_insee] >> silver_to_gold >> quality_checks >> refresh_cache >> end
+    ingest_from_filosofi >> bronze_to_silver_filosofi
+    [
+        bronze_to_silver_dvf,
+        bronze_to_silver_insee,
+        bronze_to_silver_filosofi,
+    ] >> silver_to_gold >> quality_checks >> refresh_cache >> end

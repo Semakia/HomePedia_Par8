@@ -62,6 +62,9 @@ services:
   # --- Relational Gold layer + Airflow metadata DB -------------------------
   postgres:
     image: postgres:16-alpine
+    # Auto-recover if the container is killed (e.g. Docker memory pressure):
+    # Airflow's metadata DB lives here, so a silent death breaks the scheduler.
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-homepedia}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-homepedia}
@@ -102,6 +105,8 @@ services:
       context: ../../..
       dockerfile: iac/docker/dev/spark/Dockerfile
     image: homepedia/spark:dev
+    # Auto-recover after an OOM/kill so Airflow's docker-exec target stays up.
+    restart: unless-stopped
     # Stable name so Airflow's `docker exec` has a deterministic target.
     container_name: homepedia-dev-spark-master
     # S3/AWS config for jobs (consumed by build_spark via env). For AWS, .env has
