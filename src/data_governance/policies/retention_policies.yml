@@ -1,0 +1,49 @@
+# HOMEPEDIA - Data retention policy per medaillon layer.
+
+# Declares how long eah layer's data is kept and why. Durations use a compact
+# form ('730d', '180d') or the keywords 'indefinite' / 'current'. This is the
+# governance contract; enforcement is operational (S3 lifecycle rules for the
+# object layers, truncate+reload semantics for Gold)
+
+version: 1
+
+layers:
+  bronze:
+    description: "Raw imutable source snapshots (JSON/CSV.psz + manifest.json sha256).)"
+    storage: "s3://homepedia-bronze"
+    retention: 730d    # 2 years of raw sources for reproducibility & audit
+    imutable: true     # never edited in place;
+    rationale: >
+      Kept long enough to replay any Silver/Gold build and to audit provenance,
+      but bounded so obsolete source dumps don't accumulate indefinitely.
+
+  silver:
+    description: "Cleaned Parquet (partitioned by year/departement)."
+    storage: "s3://homepedia-silver"
+    retention: indefinite    # every millésime is analytically useful
+    rationale: >
+      Historical years (DVF 2021 -> 2025, INSEE/Filosofi milesimes) power trend views, so no partition is aged out.
+  
+  gold:
+    description: "Served Postgres Gold tables (market, demographics, mobility, services)."
+    storage: "postgresql://<gold-db>/homepedia_gold_dev"
+    retention: current    # only the latest millésime is served
+    rationale: >
+      Only the latest millésime is served to end users; older partitions are truncated and reloaded on each new millésime.
+  
+  quality_reports:
+    description: "Per-run data-quality reports wrtitten to S3 (_quality/<dataset>/run=*.json) by the quality engine."
+    storage: "s3://homepedia-silver/_quality/<dataset>/run=*.json"
+    retention: 180d   # kepp 6 months of quality reports for audit and debugging
+    rationale: >
+      Enough runs to spot quality regressions over time and to satisfy the OpenMetadata test-result
+      history, without unbouded growth
+  
+  metadata_catalog:
+    description: "OpenMetadata catalog (tables, tests, glossary, lineage)."
+    storage: "openmedata (its own postgres + ElasticSearch)"
+    retention: indefinite   # OpenMetadata is the source of truth for governance
+    rationale: >
+      The OpenMetadata catalog is the source of truth for governance and audit; it is never aged out.
+  
+      

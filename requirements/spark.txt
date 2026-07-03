@@ -1,0 +1,15 @@
+# HOMEPEDIA - Spark job dependencies (Silver ETL)
+# Spark itself ships in the Bitnami image; this is the Python client + helpers.
+pyspark==3.5.*
+
+# S3A access from Spark/pandas is handled by hadoop-aws (provided in the image);
+# boto3 is used by helper code for bucket bootstrapping.
+boto3==1.35.*
+pandas==2.2.*
+
+# Declarative data-quality rules (config/data_quality/*.yaml).
+PyYAML==6.0.*
+
+# Structured logging — pulled in transitively by reused src/ helpers
+# (e.g. S3Loader -> logging_utils) when jobs write reports to S3.
+structlog==24.4.*

@@ -1,0 +1,190 @@
+# =============================================================================
+# HOMEPEDIA - Local DEV stack (data plane)
+# -----------------------------------------------------------------------------
+# Brings up the executable foundation:
+#   minio (S3/Bronze) · postgres (Gold) · redis (cache) · spark (Silver) · api
+# Airflow lives in iac/docker/dev/airflow/docker-compose.yml (shares this network).
+#
+# Run from repo root (.env auto-loaded from the working dir):
+#   docker compose -f iac/docker/dev/docker-compose.yml up -d
+# (or `task up`)
+# =============================================================================
+
+name: homepedia-dev
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # --- Object storage: Bronze/Silver/Gold buckets (S3-compatible) ----------
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+  # --- One-shot bucket bootstrap (creates the medallion buckets) -----------
+  minio-init:
+    image: minio/mc:RELEASE.2024-10-08T09-37-26Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      S3_BRONZE_BUCKET: ${S3_BRONZE_BUCKET:-homepedia-bronze}
+      S3_SILVER_BUCKET: ${S3_SILVER_BUCKET:-homepedia-silver}
+      S3_GOLD_BUCKET: ${S3_GOLD_BUCKET:-homepedia-gold}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$AWS_ACCESS_KEY_ID $$AWS_SECRET_ACCESS_KEY &&
+      mc mb --ignore-existing local/$$S3_BRONZE_BUCKET &&
+      mc mb --ignore-existing local/$$S3_SILVER_BUCKET &&
+      mc mb --ignore-existing local/$$S3_GOLD_BUCKET &&
+      echo 'buckets ready' "
+    restart: "no"
+
+  # --- Relational Gold layer + Airflow metadata DB -------------------------
+  postgres:
+    image: postgres:16-alpine
+    # Auto-recover if the container is killed (e.g. Docker memory pressure):
+    # Airflow's metadata DB lives here, so a silent death breaks the scheduler.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-homepedia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-homepedia}
+      POSTGRES_DB: ${POSTGRES_DB:-homepedia}
+      AIRFLOW_DB: ${AIRFLOW_DB:-airflow}
+      AIRFLOW_DB_USER: ${AIRFLOW_DB_USER:-airflow}
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../scripts/init_databases.sh:/docker-entrypoint-initdb.d/10-init_databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-homepedia} -d ${POSTGRES_DB:-homepedia}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+  # --- Cache layer ---------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+  # --- Spark master (Silver ETL engine) ------------------------------------
+  spark-master:
+    build:
+      context: ../../..
+      dockerfile: iac/docker/dev/spark/Dockerfile
+    image: homepedia/spark:dev
+    # Auto-recover after an OOM/kill so Airflow's docker-exec target stays up.
+    restart: unless-stopped
+    # Stable name so Airflow's `docker exec` has a deterministic target.
+    container_name: homepedia-dev-spark-master
+    # S3/AWS config for jobs (consumed by build_spark via env). For AWS, .env has
+    # S3_ENDPOINT_URL empty -> real S3; for MinIO set it to http://minio:9000.
+    env_file:
+      - ../../../.env
+    environment:
+      SPARK_MODE: master
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+    volumes:
+      # Mount repo src so `import src.*` works (PYTHONPATH set at submit time).
+      - ../../../src:/opt/homepedia/src:ro
+      # Config (data-quality rules, etc.) read by jobs at /opt/homepedia/config.
+      - ../../../config:/opt/homepedia/config:ro
+    ports:
+      - "7077:7077"   # cluster
+      - "8090:8080"   # Spark master UI
+    logging: *default-logging
+
+  spark-worker:
+    build:
+      context: ../../..
+      dockerfile: iac/docker/dev/spark/Dockerfile
+    image: homepedia/spark:dev
+    depends_on:
+      - spark-master
+    env_file:
+      - ../../../.env
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_CORES: "2"
+      SPARK_WORKER_MEMORY: 2G
+    volumes:
+      - ../../../src:/opt/homepedia/src:ro
+      - ../../../config:/opt/homepedia/config:ro
+    logging: *default-logging
+
+  # --- FastAPI backend (queries the Gold layer) ----------------------------
+  api:
+    build:
+      context: ../../..
+      dockerfile: iac/docker/dev/api/Dockerfile
+    image: homepedia/api:dev
+    env_file:
+      - ../../../.env
+    environment:
+      # In-network overrides for the local services. DATABASE_URL is NOT
+      # overridden: the API uses the .env value -> the remote Gold DB
+      # (homepedia_gold_dev on the VPS).
+      S3_ENDPOINT_URL: http://minio:9000
+      REDIS_URL: redis://redis:6379/0
+      # Remote Gold DB namespaces the market tables under "market" (not "gold").
+      GOLD_SCHEMA: market
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ../../../src:/app/src:ro   # hot-reload during dev
+    # No local-postgres dependency: the API targets the remote Gold DB.
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/health').status==200 else sys.exit(1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+
+volumes:
+  minio_data:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: homepedia-net

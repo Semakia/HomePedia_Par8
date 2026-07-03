@@ -1,0 +1,69 @@
+# HOMEPEDIA — Role-Based Access Control (RBAC) for the data platform.
+#
+# Declarative source of truth for "who may do what" across the medallion layers.
+# Loaded and enforced by src/data_governance/security/rb_access.py.
+#
+# Resources use dotted names; a role permission may target a whole layer
+# ("gold") or a single domain ("gold.market"). A `*` wildcard segment matches
+# any value ("gold.*" = every Gold domain). Actions: read | write | delete.
+#
+# Data classification: HOMEPEDIA derives exclusively from OPEN public sources
+# (DVF, INSEE, FiLoSoFi, SNCF, BPE) aggregated at commune level — no personal
+# data. Everything is classified `public`; the controls below are about
+# operational integrity (who can mutate a layer), not confidentiality.
+version: 1
+classification: public
+
+# --- Resources (data assets) ------------------------------------------------
+resources:
+  bronze: "Raw immutable landing zone (S3 homepedia-bronze) — JSON/CSV.gz + manifests."
+  silver: "Cleaned Parquet (S3 homepedia-silver), partitioned by year/departement."
+  gold.market: "Served market tables (city/arrondissement metrics, trends, prices)."
+  gold.demographics: "Served demographics (commune_profile)."
+  gold.mobility: "Served rail-mobility (commune_transport, gares)."
+  gold.services: "Served amenities (commune_equipements)."
+  quality_reports: "Data-quality run reports (S3 _quality/<dataset>/run=*.json)."
+  metadata_catalog: "OpenMetadata catalog (tables, tests, glossary, lineage)."
+
+# --- Roles → permissions ----------------------------------------------------
+roles:
+  data_engineer:
+    description: "Owns the pipelines; full control across every layer."
+    permissions:
+      - { resource: "bronze", actions: [read, write, delete] }
+      - { resource: "silver", actions: [read, write, delete] }
+      - { resource: "gold.*", actions: [read, write, delete] }
+      - { resource: "quality_reports", actions: [read, write] }
+      - { resource: "metadata_catalog", actions: [read, write] }
+
+  ingestion_service:
+    description: "Airflow/Spark service identity that runs the ETL jobs."
+    permissions:
+      - { resource: "bronze", actions: [read, write] }
+      - { resource: "silver", actions: [read, write] }
+      - { resource: "gold.*", actions: [read, write] }
+      - { resource: "quality_reports", actions: [read, write] }
+
+  data_analyst:
+    description: "Consumes the served Gold + quality reports; no layer mutation."
+    permissions:
+      - { resource: "gold.*", actions: [read] }
+      - { resource: "quality_reports", actions: [read] }
+      - { resource: "metadata_catalog", actions: [read] }
+
+  api_service:
+    description: "FastAPI Gold API identity — read-only on the served domains."
+    permissions:
+      - { resource: "gold.market", actions: [read] }
+      - { resource: "gold.demographics", actions: [read] }
+      - { resource: "gold.mobility", actions: [read] }
+      - { resource: "gold.services", actions: [read] }
+
+  catalog_viewer:
+    description: "Read-only access to the OpenMetadata catalog (governance/audit)."
+    permissions:
+      - { resource: "metadata_catalog", actions: [read] }
+
+# Note: end users of the product never touch the data platform directly — they
+# only reach commune-level aggregates through the public read-only Gold API,
+# which itself runs under the `api_service` role above.
