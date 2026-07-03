@@ -1,0 +1,61 @@
+# HOMEPEDIA - Data quality rules for demographics.commune_profile (Gold)
+# -----------------------------------------------------------------------------
+# Validates the served age/sex profile (read via JDBC from Postgres Gold).
+
+dataset: gold_demographics
+description: Quality gate for the served Gold demographic profile.
+source:
+  type: jdbc
+  table: demographics.commune_profile
+
+rules:
+  - name: not_empty
+    type: volume
+    min_rows: 30000
+    severity: critical
+
+  - name: keys_complete
+    type: completeness
+    columns: [code_commune, year, population_total]
+    max_null_pct: 0.0
+    severity: critical
+
+  - name: pk_unique
+    type: uniqueness
+    columns: [code_commune, year]
+    max_dup_pct: 0.0
+    severity: critical
+
+  # Age shares are percentages -> must stay within [0, 100].
+  - name: pct_moins25_range
+    type: range
+    column: pct_moins25
+    min: 0
+    max: 100
+    max_violation_pct: 0.0
+    severity: critical
+
+  - name: pct_25_64_range
+    type: range
+    column: pct_25_64
+    min: 0
+    max: 100
+    max_violation_pct: 0.0
+    severity: critical
+
+  - name: pct_65plus_range
+    type: range
+    column: pct_65plus
+    min: 0
+    max: 100
+    max_violation_pct: 0.0
+    severity: critical
+
+  # Sex ratio sanity (tiny communes can skew; warn beyond a wide band).
+  - name: part_femmes_sane
+    type: range
+    column: part_femmes
+    min: 20
+    max: 80
+    max_violation_pct: 1.0
+    severity: warning

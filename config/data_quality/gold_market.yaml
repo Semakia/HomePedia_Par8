@@ -1,0 +1,75 @@
+# HOMEPEDIA - Data quality rules for the Gold market.city_metrics table
+# -----------------------------------------------------------------------------
+# Runs against the SERVED Postgres Gold (read via JDBC), so it validates exactly
+# what the API exposes. severity: critical -> fails the task | warning -> logged.
+
+dataset: gold_city_metrics
+description: Quality gate for the served Gold city metrics.
+source:
+  type: jdbc
+  table: market.city_metrics
+
+rules:
+  - name: not_empty
+    type: volume
+    min_rows: 30000
+    severity: critical
+
+  # Identity/reference columns must always be present.
+  - name: keys_complete
+    type: completeness
+    columns: [code_commune, year, nom_commune, code_departement]
+    max_null_pct: 0.0
+    severity: critical
+
+  # One row per commune and year (the table PK).
+  - name: pk_unique
+    type: uniqueness
+    columns: [code_commune, year]
+    max_dup_pct: 0.0
+    severity: critical
+
+  # INSEE commune code: 5 chars, Corsica (2A/2B) tolerated.
+  - name: code_commune_format
+    type: regex
+    column: code_commune
+    pattern: '^(2[AB][0-9]{3}|[0-9]{5})$'
+    max_violation_pct: 0.0
+    severity: critical
+
+  # Median price per m2 within a sane band (cities always have DVF data).
+  - name: prix_m2_plausible
+    type: range
+    column: prix_m2_median
+    min: 100
+    max: 100000
+    max_violation_pct: 0.0
+    severity: critical
+
+  # Size class must be one of the known tiers (null for no-population communes).
+  - name: type_commune_known
+    type: set
+    column: type_commune
+    allowed: [Village, Bourg, "Petite ville", "Ville moyenne", "Grande ville"]
+    ignore_nulls: true
+    max_violation_pct: 0.0
+    severity: warning
+
+  # Affordability label must be one of the 4 tiers (null when income missing).
+  - name: affordability_class_known
+    type: set
+    column: affordability_class
+    allowed: ["Très abordable", Abordable, Tendu, "Très tendu"]
+    ignore_nulls: true
+    max_violation_pct: 0.0
+    severity: warning
+
+  # Population sanity (nullable: communes outside the INSEE referential).
+  - name: population_plausible
+    type: range
+    column: population
+    min: 1
+    max: 2500000
+    ignore_nulls: true
+    max_violation_pct: 0.0
+    severity: warning

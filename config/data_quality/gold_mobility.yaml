@@ -1,0 +1,53 @@
+# HOMEPEDIA - Data quality rules for the Gold mobility.commune_transport table
+# -----------------------------------------------------------------------------
+# Runs against the SERVED Postgres Gold (read via JDBC). SNCF rail accessibility.
+
+dataset: gold_mobility
+description: Quality gate for the served Gold transport accessibility.
+source:
+  type: jdbc
+  table: mobility.commune_transport
+
+rules:
+  - name: not_empty
+    type: volume
+    min_rows: 2000
+    severity: critical
+
+  - name: keys_complete
+    type: completeness
+    columns: [code_commune]
+    max_null_pct: 0.0
+    severity: critical
+
+  - name: pk_unique
+    type: uniqueness
+    columns: [code_commune]
+    max_dup_pct: 0.0
+    severity: critical
+
+  - name: code_commune_format
+    type: regex
+    column: code_commune
+    pattern: '^(2[AB][0-9]{3}|[0-9]{5})$'
+    max_violation_pct: 0.0
+    severity: critical
+
+  # Desserte class must be one of the 4 known tiers.
+  - name: desserte_class_known
+    type: set
+    column: desserte_class
+    allowed: ["Hub majeur", "Bien desservie", "Desservie", "Non desservie"]
+    ignore_nulls: true
+    max_violation_pct: 0.0
+    severity: warning
+
+  # Distance to nearest station: 0 (served) .. 150 km cap (else nulled).
+  - name: distance_gare_in_range
+    type: range
+    column: distance_gare_km
+    min: 0
+    max: 150
+    ignore_nulls: true
+    max_violation_pct: 0.0
+    severity: warning

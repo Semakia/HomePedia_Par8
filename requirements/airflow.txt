@@ -1,8 +1,0 @@
-# HOMEPEDIA - Airflow orchestration dependencies
-# Airflow core is pinned by the official image (AIRFLOW_VERSION below must match
-# the image tag used in iac/docker/dev/airflow/docker-compose.yml).
-# Install providers ON TOP of the base image via _PIP_ADDITIONAL_REQUIREMENTS.
-
-apache-airflow-providers-amazon==9.0.*
-apache-airflow-providers-postgres==5.13.*
-apache-airflow-providers-apache-spark==4.11.*

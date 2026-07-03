@@ -1,0 +1,52 @@
+# HOMEPEDIA - Data quality rules for the Gold services.commune_equipements table
+# -----------------------------------------------------------------------------
+# Runs against the SERVED Postgres Gold (read via JDBC). INSEE BPE amenities.
+
+dataset: gold_services
+description: Quality gate for the served Gold local-amenities profile.
+source:
+  type: jdbc
+  table: services.commune_equipements
+
+rules:
+  - name: not_empty
+    type: volume
+    min_rows: 30000
+    severity: critical
+
+  - name: keys_complete
+    type: completeness
+    columns: [code_commune, year]
+    max_null_pct: 0.0
+    severity: critical
+
+  - name: pk_unique
+    type: uniqueness
+    columns: [code_commune]
+    max_dup_pct: 0.0
+    severity: critical
+
+  - name: code_commune_format
+    type: regex
+    column: code_commune
+    pattern: '^(2[AB][0-9]{3}|[0-9]{5})$'
+    max_violation_pct: 0.0
+    severity: critical
+
+  # Equipment level must be one of the 4 known tiers.
+  - name: niveau_equipement_known
+    type: set
+    column: niveau_equipement
+    allowed: ["Sous-équipée", "Équipée", "Bien équipée", "Très équipée"]
+    ignore_nulls: true
+    max_violation_pct: 0.0
+    severity: warning
+
+  # Counts are never negative (sanity on the pivot).
+  - name: nb_total_non_negative
+    type: range
+    column: nb_total
+    min: 0
+    max: null
+    max_violation_pct: 0.0
+    severity: critical

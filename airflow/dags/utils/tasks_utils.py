@@ -122,6 +122,50 @@ class HomepediaETLTasks:
         )
         return {"year": year, "objects": results}
 
+    def ingest_sncf(self, **_) -> dict:
+        """
+        Land SNCF station open data (gares + frequentation) into Bronze S3.
+
+        Idempotent (the connector skips objects already present). No params:
+        the SNCF referential is a national snapshot. Returns an XCom summary.
+        """
+        from src.data_ingestion.sources.sncf_connector import SNCFConnector
+
+        result = SNCFConnector().ingest()
+        self.logger.info(
+            "sncf.ingest.summary",
+            **{k: v.get("records") for k, v in result["exports"].items()},
+        )
+        return result
+
+    def ingest_bpe(self, **context) -> dict:
+        """Land INSEE BPE amenity counts into Bronze S3 for each departement.
+
+        Idempotent: the connector skips objects already present (no overwrite).
+        Returns a summary pushed to XCom.
+        """
+        params = context.get("params", {})
+        year = min(int(params.get("year", 2024)), 2024)  # BPE latest = 2024
+        requested = [str(d) for d in (params.get("departements") or [])]
+        departements = requested or self.load_departements()
+
+        from src.data_ingestion.sources.bpe_connector import BPEConnector
+
+        connector = BPEConnector()
+        results: list[dict] = []
+        for dep in departements:
+            results.append(connector.ingest(year=year, departement=dep))
+
+        landed = [r for r in results if not r.get("skipped")]
+        self.logger.info(
+            "bpe.ingest.summary",
+            year=year,
+            requested=len(results),
+            landed=len(landed),
+            skipped=len(results) - len(landed),
+        )
+        return {"year": year, "objects": results}
+
     # downstream (stubs)
     # NB: silver_to_gold is NOT here — it runs as a Spark JDBC job inside the
     # spark-master container (BashOperator docker exec in the DAG), since it
