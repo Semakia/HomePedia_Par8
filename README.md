@@ -1,6 +1,5 @@
 # HOMEPEDIA
 
-![Epitech](https://img.shields.io/badge/Epitech-T--DAT--902-1d4ed8)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
