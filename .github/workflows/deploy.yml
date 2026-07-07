@@ -1,0 +1,126 @@
+name: Build & Deploy
+
+# Builds the four prod images, pushes them to GHCR, then deploys the whole
+# stack to the single OVH VPS (serving + data plane on one machine):
+#   api + frontend + postgres + redis + caddy + airflow + spark
+#
+# Triggers: a version tag (v1.2.3) or a manual run (pick the image tag).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to build & deploy"
+        required: true
+        default: "latest"
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Lowercased owner/repo → ghcr.io/<owner>/<repo>/homepedia-<image>
+  REGISTRY: ghcr.io
+  IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.ref_name }}
+
+jobs:
+  build:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        image: [api, frontend, spark, airflow]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Registry namespace (lowercase)
+        id: ns
+        run: echo "repo=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push ${{ matrix.image }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: iac/docker/prod/${{ matrix.image }}/Dockerfile
+          push: true
+          # Frontend inlines the public API URL at build time (no-op for others).
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.ns.outputs.repo }}/homepedia-${{ matrix.image }}:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ steps.ns.outputs.repo }}/homepedia-${{ matrix.image }}:latest
+          # Links the GHCR package to this repo so repo members inherit pull
+          # access automatically (no per-package admin needed).
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-vps:
+    name: Deploy full stack (VPS)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read           # GITHUB_TOKEN must be able to pull the images
+    steps:
+      - name: SSH deploy (whole stack)
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          # Ephemeral workflow token: guaranteed access to THIS repo's own GHCR
+          # packages AND its git contents (no personal PAT / per-package grants).
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          GH_REF: ${{ github.ref_name }}
+          # Base64-encoded credentials/config, decoded onto the VPS below. Set
+          # them once as repo secrets (base64 -w0 <file>). Never printed.
+          GCP_ADC_B64: ${{ secrets.GCP_ADC_B64 }}
+          SPARK_VM_KEY_B64: ${{ secrets.SPARK_VM_KEY_B64 }}
+          ENV_PROD_B64: ${{ secrets.ENV_PROD_B64 }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: IMAGE_TAG,GHCR_USER,GHCR_TOKEN,GH_REPO,GH_REF,GCP_ADC_B64,SPARK_VM_KEY_B64,ENV_PROD_B64
+          script: |
+            set -e
+            # VPS_DEPLOY_PATH = repo root on the VPS. The single .env.prod lives
+            # there; the Airflow credentials go under the vps compose dir.
+            cd "${{ secrets.VPS_DEPLOY_PATH }}"
+            # Sync the repo to the deployed ref so compose/config are current
+            # (token passed inline, never persisted; .env.prod + secrets/ are
+            # gitignored, so checkout -f leaves them untouched).
+            git config --global --add safe.directory "$PWD" 2>/dev/null || true
+            git fetch --depth 1 "https://x-access-token:${GHCR_TOKEN}@github.com/${GH_REPO}.git" "$GH_REF"
+            git checkout -f FETCH_HEAD
+            C=iac/docker/prod/vps
+            printf '%s' "$ENV_PROD_B64"     | base64 -d > .env.prod
+            mkdir -p "$C/secrets"
+            printf '%s' "$GCP_ADC_B64"      | base64 -d > "$C/secrets/adc.json"
+            printf '%s' "$SPARK_VM_KEY_B64" | base64 -d > "$C/secrets/spark_vm"
+            # .env.prod is read by docker compose on the host; adc.json and the
+            # SSH key are mounted into the airflow container (uid 50000) and must
+            # be readable by "others" (paramiko tolerates a 644 key file).
+            chmod 600 .env.prod
+            chmod 644 "$C/secrets/adc.json" "$C/secrets/spark_vm"
+            # Log in to GHCR with the workflow token, pull, then drop the cred.
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            docker compose -f "$C/docker-compose.yml" --env-file .env.prod pull
+            docker compose -f "$C/docker-compose.yml" --env-file .env.prod up -d --remove-orphans
+            docker logout ghcr.io || true

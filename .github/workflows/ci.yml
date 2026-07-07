@@ -1,0 +1,106 @@
+name: CI
+
+# Pipeline: plan (what changed?) → code quality gates (backend / frontend,
+# skipped when untouched) → Build (frontend production build). Runs on every
+# branch push and PR.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --- plan: detect which parts of the repo changed --------------------------
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'src/**'
+              - 'airflow/**'
+              - 'tests/**'
+              - 'requirements/**'
+              - 'config/**'
+              - 'pyproject.toml'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+
+  # --- code: Backend — lint + unit tests (only if backend changed) -----------
+  backend:
+    name: "code: Backend"
+    needs: plan
+    if: ${{ needs.plan.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/base.txt -r requirements/dev.txt
+      - name: Ruff (lint)
+        run: ruff check .
+      - name: Pytest (unit)
+        run: pytest tests/unit -q
+
+  # --- code: Frontend — lint + typecheck (only if frontend changed) ----------
+  frontend:
+    name: "code: Frontend"
+    needs: plan
+    if: ${{ needs.plan.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+  # --- Build — frontend production build (gated on frontend quality) ---------
+  build:
+    name: Build
+    needs: [plan, frontend]
+    if: ${{ needs.plan.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000' }}
