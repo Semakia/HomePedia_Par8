@@ -21,7 +21,7 @@ import hashlib
 import json
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 from src.data_ingestion.loaders.s3_loader import S3Loader
@@ -115,7 +115,7 @@ class SNCFConnector:
             "records": len(records),
             "bytes": size,
             "sha256": sha.hexdigest(),
-            "ingested_at": datetime.now(timezone.utc).isoformat(),
+            "ingested_at": datetime.now(UTC).isoformat(),
         }
         try:
             self.loader.upload_file(

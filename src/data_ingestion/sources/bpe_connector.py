@@ -22,7 +22,7 @@ import json
 import os
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 from src.data_ingestion.loaders.s3_loader import S3Loader, bronze_key
@@ -135,7 +135,7 @@ class BPEConnector:
             "dataset": DATASET, "year": year, "departement": departement,
             "source_url": MELODI_URL, "bronze_uri": f"s3://{self.bucket}/{key}",
             "observations": len(all_obs), "bytes": size, "sha256": sha.hexdigest(),
-            "ingested_at": datetime.now(timezone.utc).isoformat(),
+            "ingested_at": datetime.now(UTC).isoformat(),
         }
         try:
             self.loader.upload_file(

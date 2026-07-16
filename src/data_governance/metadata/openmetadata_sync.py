@@ -31,7 +31,7 @@ import json
 import os
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import boto3
 from dotenv import load_dotenv
@@ -195,7 +195,7 @@ def main() -> None:
 
     cfg = DATASETS[args.dataset]
     report = latest_report(args.dataset)
-    when_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    when_ms = int(datetime.now(UTC).timestamp() * 1000)
 
     om = OpenMetadataClient(cfg["fqn"])
     if cfg["logical"]:

@@ -7,7 +7,6 @@ drill-down opened when the user clicks one of those communes on the map.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-
 from src.api.deps import get_arrondissement_service
 from src.api.schemas.arrondissement import ArrondissementDetail, ArrondissementMetrics
 from src.api.schemas.common import Page

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-
 from src.api.deps import (
     get_city_service,
     get_housing_service,

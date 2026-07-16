@@ -20,7 +20,6 @@ from dataclasses import dataclass
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
-
 from src.data_ingestion.utils.logging_utils import get_logger
 
 log = get_logger(__name__)
@@ -85,7 +84,7 @@ class S3Loader:
         )
 
     @classmethod
-    def from_env(cls) -> "S3Loader":
+    def from_env(cls) -> S3Loader:
         # Empty string -> None so boto3 uses AWS defaults / credential chain.
         return cls(
             endpoint_url=os.getenv("S3_ENDPOINT_URL") or None,
@@ -140,7 +139,8 @@ class S3Loader:
                 - key : target object key (path within the bucket)
                 - local_path : path to the local file to upload
                 - content_type : MIME type of the file (default: application/octet-stream)
-                - metadata : optional user metadata to attach to the object (dict of string key-values)
+                - metadata : optional user metadata to attach to the object
+                  (dict of string key-values)
             Returns: the s3 URI of the uploaded object (e.g. "s3://my-bucket/path
         """
         extra = {"ContentType": content_type}

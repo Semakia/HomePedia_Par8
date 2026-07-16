@@ -13,7 +13,6 @@ import boto3
 import redis
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-
 from src.api.config import get_settings
 
 

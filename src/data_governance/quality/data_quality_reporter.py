@@ -13,10 +13,9 @@ from __future__ import annotations
 
 import argparse
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import yaml
-
 from src.data_governance.quality.quality_monitor import CheckResult, QualityMonitor
 from src.data_ingestion.loaders.s3_loader import S3Loader
 from src.data_processing.utils.spark_utils import build_s3a_uri, build_spark
@@ -75,7 +74,7 @@ class QualityReporter:
         warnings = [r for r in results if not r.passed and r.severity == "warning"]
         return {
             "dataset": dataset,
-            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "checked_at": datetime.now(UTC).isoformat(),
             "total_rows": total,
             "passed": len(critical) == 0,
             "critical_failures": len(critical),

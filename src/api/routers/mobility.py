@@ -6,7 +6,6 @@ Served as a point layer the map can toggle on top of the commune choropleth.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
-
 from src.api.deps import get_mobility_service
 from src.api.schemas.common import Page
 from src.api.schemas.mobility import Gare

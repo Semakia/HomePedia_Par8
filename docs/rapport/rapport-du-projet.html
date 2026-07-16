@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>HOMEPEDIA : Rapport de visualisation des données</title>
+<style>
+  :root {
+    --blue: #1d4ed8;
+    --blue-dark: #1e3a8a;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --amber: #b45309;
+    --line: #d1d5db;
+    --soft: #eef2ff;
+  }
+
+  * { box-sizing: border-box; }
+
+  @page {
+    size: A4;
+    margin: 20mm 18mm;
+  }
+
+  body {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    color: var(--ink);
+    text-align: justify;
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  p { margin: 0 0 .6em; }
+
+  h1, h2, h3, h4 {
+    color: var(--blue);
+    text-align: left;
+    font-weight: bold;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  h2 {
+    color: var(--blue-dark);
+    font-size: 16pt;
+    margin: 1.6em 0 .5em;
+    padding-bottom: .18em;
+    border-bottom: 2px solid var(--blue-dark);
+  }
+  h3 {
+    font-size: 13.5pt;
+    margin: 1.1em 0 .35em;
+  }
+  h4 {
+    font-size: 12pt;
+    margin: .9em 0 .3em;
+    color: var(--blue);
+  }
+
+  /* ---- Page de garde ---- */
+  .cover {
+    height: 257mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    page-break-after: always;
+  }
+  .cover .brand {
+    font-size: 40pt;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: var(--blue-dark);
+    margin: 0;
+  }
+  .cover .rule {
+    width: 90mm;
+    height: 3px;
+    background: var(--blue);
+    margin: 10mm 0;
+    border: 0;
+  }
+  .cover .subtitle {
+    font-size: 17pt;
+    color: var(--ink);
+    max-width: 130mm;
+    margin: 0 0 4mm;
+  }
+  .cover .tagline {
+    font-size: 12.5pt;
+    color: var(--muted);
+    font-style: italic;
+    max-width: 120mm;
+  }
+  .cover .meta {
+    margin-top: 22mm;
+    font-size: 12.5pt;
+    line-height: 1.8;
+  }
+  .cover .meta strong { color: var(--blue-dark); }
+
+  /* ---- Sommaire ---- */
+  .toc { page-break-after: always; }
+  .toc h2 { margin-top: 0; }
+  .toc ol { list-style: none; margin: 0; padding: 0; }
+  .toc > ol > li { margin: .35em 0; font-weight: bold; }
+  .toc ol ol { padding-left: 8mm; }
+  .toc ol ol li { margin: .12em 0; font-weight: normal; }
+  .toc a { color: var(--blue); text-decoration: none; }
+  .toc .num { display: inline-block; min-width: 12mm; color: var(--blue-dark); }
+  .toc ol ol .num { min-width: 14mm; }
+
+  /* ---- Figures ---- */
+  figure {
+    margin: 1em 0;
+    text-align: center;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  figure img {
+    max-width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+  figcaption {
+    font-size: 10.5pt;
+    color: var(--muted);
+    font-style: italic;
+    text-align: center;
+    margin-top: .4em;
+  }
+  figcaption b { color: var(--blue); font-style: normal; }
+
+  /* ---- Justification "Pourquoi / Plutôt que" ---- */
+  .why, .alt { margin: 0 0 .5em; padding-left: 6mm; }
+  .why::before {
+    content: "Pourquoi : ";
+    color: var(--blue);
+    font-weight: bold;
+  }
+  .alt::before {
+    content: "Plutôt que : ";
+    color: var(--amber);
+    font-weight: bold;
+  }
+  .rulename { font-weight: bold; margin: .7em 0 .15em; }
+
+  /* ---- Encadré ---- */
+  .box {
+    background: var(--soft);
+    border: 1px solid #c7d2fe;
+    border-left: 4px solid var(--blue);
+    border-radius: 6px;
+    padding: 3mm 5mm;
+    margin: 1em 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .box .box-title { font-weight: bold; color: var(--blue-dark); margin-bottom: .3em; }
+  .box ul { margin: .3em 0; padding-left: 6mm; }
+  .box li { margin: .25em 0; }
+
+  .lead {
+    background: var(--soft);
+    border-left: 4px solid var(--blue);
+    padding: 3mm 5mm;
+    border-radius: 0 6px 6px 0;
+    margin: 0 0 1em;
+  }
+
+  code {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 10.5pt;
+    background: #f3f4f6;
+    padding: 0 3px;
+    border-radius: 3px;
+  }
+
+  ul.axes { margin: .3em 0 1em; }
+  ul.axes li { margin: .3em 0; }
+  ul.axes i { color: var(--blue); font-style: normal; font-weight: bold; }
+
+  /* ---- Tableau annexe ---- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10.5pt;
+    margin: 1em 0;
+  }
+  thead th {
+    background: var(--blue-dark);
+    color: #fff;
+    text-align: left;
+    padding: 2mm 3mm;
+    font-size: 10pt;
+    letter-spacing: .5px;
+  }
+  tbody td {
+    border-bottom: 1px solid var(--line);
+    padding: 2mm 3mm;
+    vertical-align: top;
+  }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  td .m { font-weight: bold; color: var(--blue-dark); }
+  td code { font-size: 9.5pt; }
+
+  .src {
+    font-size: 10pt;
+    color: var(--muted);
+    margin-top: 1.2em;
+    border-top: 1px solid var(--line);
+    padding-top: .6em;
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= PAGE DE GARDE ======================= -->
+<section class="cover">
+  <p class="brand">HOMEPEDIA</p>
+  <hr class="rule">
+  <p class="subtitle">Rapport de visualisation des données</p>
+  <p class="tagline">Où un jeune actif doit-il acheter en France ?<br>
+    Justification des visualisations, des métriques et des règles métier.</p>
+
+  <div class="meta">
+    <div>Projet <strong>Big Data</strong> : architecture médaillon Bronze → Silver → Gold</div>
+    <div>Epitech · <strong>T-DAT-902</strong> · MSc Pro : Promotion 2026</div>
+    <div>Réalisé par le <strong>groupe PAR_5</strong></div>
+    <div>Juillet 2026</div>
+  </div>
+</section>
+
+<!-- ======================= SOMMAIRE ======================= -->
+<nav class="toc">
+  <h2>Sommaire</h2>
+  <ol>
+    <li><a href="#s1"><span class="num">I.</span>Problématique</a></li>
+    <li><a href="#s2"><span class="num">II.</span>Provenance des données</a></li>
+    <li>
+      <a href="#s3"><span class="num">III.</span>Les graphiques de l'application</a>
+      <ol>
+        <li><a href="#s3-1"><span class="num">III.1</span>La carte interactive (Cartographe)</a></li>
+        <li><a href="#s3-2"><span class="num">III.2</span>Les 6 modes de coloration &amp; le calque gares</a></li>
+        <li><a href="#s3-3"><span class="num">III.3</span>La fiche commune &amp; le drill-down arrondissements</a></li>
+        <li><a href="#s3-4"><span class="num">III.4</span>La page Statistiques (7 graphiques)</a></li>
+        <li><a href="#s3-5"><span class="num">III.5</span>Le tableau des arrondissements</a></li>
+        <li><a href="#s3-6"><span class="num">III.6</span>La synthèse textuelle</a></li>
+      </ol>
+    </li>
+    <li>
+      <a href="#s4"><span class="num">IV.</span>Justification des règles métier : pourquoi ces choix&nbsp;?</a>
+      <ol>
+        <li><a href="#s4-1"><span class="num">IV.1</span>Prix médian &amp; filtrage DVF</a></li>
+        <li><a href="#s4-2"><span class="num">IV.2</span>Abordabilité (années de revenu, classes)</a></li>
+        <li><a href="#s4-3"><span class="num">IV.3</span>Transport &amp; équipements</a></li>
+        <li><a href="#s4-4"><span class="num">IV.4</span>Score de correspondance</a></li>
+        <li><a href="#s4-5"><span class="num">IV.5</span>Analyse textuelle : règles plutôt que LLM</a></li>
+      </ol>
+    </li>
+    <li>
+      <a href="#s6"><span class="num">V.</span>Architecture technique &amp; stack</a>
+      <ol>
+        <li><a href="#s6-1"><span class="num">V.1</span>Vue d'ensemble &amp; pipeline médaillon</a></li>
+        <li><a href="#s6-2"><span class="num">V.2</span>La stack, brique par brique</a></li>
+        <li><a href="#s6-3"><span class="num">V.3</span>Orchestration, exécution &amp; déploiement</a></li>
+      </ol>
+    </li>
+    <li>
+      <a href="#s7"><span class="num">VI.</span>Méthodologie</a>
+      <ol>
+        <li><a href="#s7-1"><span class="num">VI.1</span>Démarche projet</a></li>
+        <li><a href="#s7-2"><span class="num">VI.2</span>Acquisition &amp; traitement des données</a></li>
+        <li><a href="#s7-3"><span class="num">VI.3</span>Qualité &amp; gouvernance</a></li>
+        <li><a href="#s7-4"><span class="num">VI.4</span>Outils &amp; collaboration</a></li>
+      </ol>
+    </li>
+    <li><a href="#s5"><span class="num">VII.</span>Annexe : Comment chaque métrique est calculée</a></li>
+  </ol>
+</nav>
+
+<!-- ======================= I. PROBLÉMATIQUE ======================= -->
+<h2 id="s1">I. Problématique</h2>
+<p class="lead">
+  HOMEPEDIA aide un <b>jeune actif à décider où acheter un bien en France</b>.
+  La difficulté n'est pas le manque de données, mais leur <b>lecture</b> : un prix au m² seul ne dit
+  pas si un quartier est abordable au regard des revenus, bien desservi, équipé, ou peuplé de « gens
+  comme moi ».
+</p>
+<p>
+  Chaque visualisation du front existe pour transformer une de ces questions en une <b>décision</b>.
+  Ce rapport justifie, pour chaque graphique, le <b>choix de la métrique</b>, son utilité, son lien à
+  la problématique et son <b>mode de calcul</b>.
+</p>
+
+<!-- ======================= II. PROVENANCE ======================= -->
+<h2 id="s2">II. Provenance des données</h2>
+<p>
+  La donnée provient de la <b>couche Gold</b> (PostgreSQL pré-agrégé, architecture médaillon
+  Bronze → Silver → Gold), consommée via une API. Elle croise <b>quatre axes de décision</b> :
+</p>
+<ul class="axes">
+  <li><b>Prix &amp; abordabilité</b> : DVF (Etalab) × revenus FiLoSoFi (INSEE) ;</li>
+  <li><b>Transport</b> : gares SNCF (open data) ;</li>
+  <li><b>Services &amp; commerces</b> : équipements BPE (INSEE) ;</li>
+  <li><b>Démographie</b> : recensement INSEE.</li>
+</ul>
+<p>Les visualisations sont organisées autour de ces quatre axes.</p>
+
+<!-- ======================= III. LES GRAPHIQUES ======================= -->
+<h2 id="s3">III. Les graphiques de l'application</h2>
+
+<!-- III.1 -->
+<h3 id="s3-1">III.1 La carte interactive (Cartographe)</h3>
+<p>
+  C'est la <b>vue d'entrée</b>. Elle colore chaque commune d'Île-de-France (ou chaque département en
+  vue « France ») et répond à la question centrale : <b>« où, sur le territoire, dois-je regarder ? »</b>.
+  Sa force est de superposer tous les critères sur une même lecture spatiale.
+</p>
+
+<figure>
+  <img src="img/carto.png" alt="Carte choroplèthe de l'Île-de-France colorée par score de correspondance">
+  <figcaption>
+    <b>Fig. 1 : Cartographe.</b> Choroplèthe d'Île-de-France colorée par score de correspondance
+    (vert = meilleure adéquation), panneau de critères / pondérations à gauche, communes recommandées
+    classées à droite.
+  </figcaption>
+</figure>
+
+<h4>Le score de correspondance personnalisé (0–100)</h4>
+<p>
+  Métrique phare : un <b>score unique</b> qui synthétise l'adéquation d'une commune au profil de
+  l'utilisateur. Il agrège quatre sous-scores : <b>budget, transport, services, jeunes actifs</b> :
+  chacun normalisé entre 0 et 1, puis combinés en <b>moyenne pondérée</b> par les curseurs d'importance
+  que l'utilisateur règle lui-même (les dimensions sans donnée sont exclues du calcul). La couleur va du
+  vert (excellent, ≥ 75) au rouge (hors cible, &lt; 25).
+</p>
+<p class="why">
+  c'est la traduction directe de la problématique : au lieu de comparer mentalement cinq indicateurs,
+  l'utilisateur voit <b>une carte à son image</b>. En déplaçant les curseurs (« le budget compte plus
+  que le transport »), il voit la carte se recolorer : la décision devient exploratoire et personnelle.
+</p>
+
+<div class="box">
+  <div class="box-title">Comment le score est calculé, pas à pas</div>
+  <p><b>1. On note chaque dimension de 0 à 100.</b></p>
+  <ul>
+    <li><b>Budget</b> : l'utilisateur saisit un budget et une surface, d'où un prix cible €/m²
+      (= budget ÷ surface). Une commune nettement <i>moins chère</i> que la cible obtient une note
+      élevée ; une commune <i>au-dessus</i>, une note faible. Sans budget saisi, on reprend la classe
+      d'abordabilité (Très abordable ≈ 100 … Très tendu ≈ 15).</li>
+    <li><b>Transport</b> : d'après la classe de desserte : Hub majeur 100, Bien desservie 80,
+      Desservie 55, Non desservie 10, <i>moins</i> une pénalité si la gare la plus proche est à plus
+      de 2 km.</li>
+    <li><b>Services</b> : d'après le niveau d'équipement : Très équipée 100, Bien équipée 75,
+      Équipée 50, Sous-équipée 20.</li>
+    <li><b>Jeunes actifs</b> : part de population active (25-64 + moins de 25) ramenée sur 100 :
+      50 % → 0, 85 % → 100.</li>
+  </ul>
+  <p><b>2. On fait la moyenne pondérée</b> de ces quatre notes par les curseurs d'importance
+    (Budget / Transport / Services / Ambiance jeune). Une dimension sans donnée est simplement retirée
+    de la moyenne.</p>
+  <p><b>Exemple.</b> Notes 80 / 80 / 75 / 60 et poids par défaut 60 / 50 / 40 / 30 →
+    (80·60 + 80·50 + 75·40 + 60·30) ÷ (60+50+40+30) = 13 600 ÷ 180 ≈ <b>76 / 100</b> : commune
+    affichée en vert sur la carte.</p>
+</div>
+
+<!-- III.2 -->
+<h3 id="s3-2">III.2 Les 6 modes de coloration &amp; le calque gares</h3>
+<p>
+  La même carte se relit selon un seul critère à la fois : <b>Mon score, Prix au m², Abordabilité,
+  Transport, Équipements, Jeunes actifs</b>. Chaque mode a sa propre échelle de couleur et sa légende
+  (verrouillées ensemble dans le code pour ne jamais diverger). Un <b>calque de gares</b> (points
+  cliquables) se superpose pour juger la desserte fine. Les <b>filtres durs</b> (desserte minimale,
+  distance max à une gare, niveau d'équipement minimal) grisent les communes hors critères, et une
+  <b>liste de recommandations</b> classe les meilleures.
+</p>
+<p class="why">
+  un jeune actif ne pondère pas tout pareil. Les modes permettent d'isoler <i>le</i> critère décisif du
+  moment (« montre-moi seulement l'abordabilité »), tandis que les filtres durs éliminent d'emblée
+  l'inacceptable (« pas de bien à plus de 2 km d'une gare »).
+</p>
+
+<!-- III.3 -->
+<h3 id="s3-3">III.3 La fiche commune &amp; le drill-down arrondissements</h3>
+<p>
+  Cliquer une commune ouvre une <b>fiche</b> : score et ses 4 sous-scores en barres,
+  <b>surface atteignable</b> avec le budget saisi (<code>budget ÷ prix_m2 local</code>), mini-courbe de
+  tendance, transport, équipements et pyramide d'âge. Pour Paris, Lyon et Marseille, un
+  <b>drill-down</b> descend à l'arrondissement : seule granularité infra-communale disponible.
+</p>
+<p class="why">
+  la carte donne la vue d'ensemble ; la fiche donne les <b>informations concrètes pour décider</b> sur
+  une zone précise, dont le message le plus parlant pour un acheteur : « avec votre budget, ici, vous
+  pourriez acheter ≈ X m² ».
+</p>
+
+<!-- III.4 -->
+<h3 id="s3-4">III.4 La page Statistiques (7 graphiques)</h3>
+<p>
+  Elle approfondit une zone choisie (Paris par défaut, ou « France entière » en agrégat pondéré). Les
+  graphiques sont groupés en trois blocs.
+</p>
+
+<h4>Prix &amp; marché</h4>
+<ul class="axes">
+  <li><b>Bandeau d'indicateurs (KPIs)</b> : prix médian (+ variation vs mois précédent), classe
+    d'abordabilité (+ années de revenu), revenu médian, population, desserte, niveau d'équipement.
+    <i>Pourquoi</i> : un résumé chiffré en un coup d'œil des six dimensions de décision, avant tout
+    graphique.</li>
+  <li><b>Prix médian mensuel</b> (barres) : année en cours vs année précédente, avec le Δ.
+    <i>Pourquoi</i> : montre la <b>dynamique</b> du marché : acheter dans un marché qui grimpe vite est
+    plus risqué (pouvoir d'achat qui s'érode) qu'un marché stable.</li>
+  <li><b>Historique annuel</b> (ligne prix médian + barres volume de ventes). <i>Pourquoi</i> :
+    recontextualise le prix sur plusieurs millésimes et croise avec le <b>volume de transactions</b> :
+    un prix appuyé sur peu de ventes est moins fiable.</li>
+  <li><b>Répartition par type</b> (donut) : part des transactions Appartement vs Maison.
+    <i>Pourquoi</i> : indique la réalité du marché local : à Paris, chercher une maison n'a guère de
+    sens ; le donut le rend évident.</li>
+  <li><b>Prix par type de bien</b> (barres) : prix médian €/m² Maison vs Appartement + surface médiane.
+    <i>Pourquoi</i> : le budget se raisonne par type ; l'écart de prix oriente le choix
+    Appartement / Maison.</li>
+</ul>
+
+<h4>Cadre de vie</h4>
+<ul class="axes">
+  <li><b>Profil de population</b> (donut) : répartition par âge (−25 / 25–64 / 65+). <i>Pourquoi</i> :
+    matche la cible « jeunes actifs » : une zone jeune et active est un signal d'adéquation de mode de
+    vie.</li>
+  <li><b>Services &amp; commerces</b> (barres) : comptages d'équipements Santé, Commerces,
+    Enseignement, Supermarchés. <i>Pourquoi</i> : la qualité de vie quotidienne se lit dans la
+    proximité des services ; un quartier abordable mais sous-équipé n'est pas un bon compromis.</li>
+</ul>
+
+<h4>Correspondance</h4>
+<ul class="axes">
+  <li><b>Radar de correspondance</b> : les 4 sous-scores (Budget, Transport, Services, Jeunes actifs)
+    + le score global. <i>Pourquoi</i> : boucle la page vers le cœur produit : d'un coup d'œil, on voit
+    <i>sur quel axe</i> une zone est forte ou faible, sans lire cinq chiffres.</li>
+</ul>
+
+<!-- III.5 -->
+<h3 id="s3-5">III.5 Le tableau des arrondissements</h3>
+<p>
+  Une table triable / filtrable des <b>45 arrondissements</b> de Paris, Lyon et Marseille : prix médian,
+  surface, revenu, population, transactions, <b>années de revenu</b>, m²/an, classe d'abordabilité :
+  avec export CSV.
+</p>
+<p class="why">
+  la carte est faite pour explorer, le tableau pour <b>comparer et classer</b> précisément (« trier tous
+  les arrondissements du plus abordable au plus tendu »). C'est aussi la seule vue qui exploite la
+  granularité <b>infra-communale</b> de la couche Gold, essentielle pour un choix intra-Paris.
+</p>
+<figure>
+  <img src="img/tableau.png" alt="Tableau triable des arrondissements de Paris, Lyon et Marseille">
+  <figcaption>
+    <b>Fig. 2 : Tableau des arrondissements.</b> Comparaison triable colonne par colonne (ici Paris, par
+    prix décroissant) ; la pastille colorée encode la classe d'abordabilité, export CSV en un clic.
+  </figcaption>
+</figure>
+
+<!-- III.6 -->
+<h3 id="s3-6">III.6 La synthèse textuelle</h3>
+<p>
+  Un <b>moteur à base de règles</b> (seuils + gabarits, sans IA) traduit les chiffres d'une commune en
+  analyse rédigée : un paragraphe de synthèse puis des cartes thématiques (abordabilité, marché,
+  transport, équipements, démographie, tendance), chacune comparée à la moyenne nationale et colorée par
+  tonalité (favorable / neutre / vigilance).
+</p>
+<p class="why">
+  toute la richesse des données ne sert à rien si l'utilisateur ne sait pas l'interpréter. La synthèse
+  rend la donnée <b>lisible pour un non-expert</b> ; basée sur des règles, elle est <b>déterministe et
+  explicable</b> (même entrée → même texte), contrairement à une génération par LLM.
+</p>
+<figure>
+  <img src="img/analyse.png" alt="Page d'analyse textuelle générée à partir des indicateurs Gold">
+  <figcaption>
+    <b>Fig. 3 : Analyse textuelle.</b> Une synthèse de tête puis une carte par thème (abordabilité,
+    marché, transport, équipements, démographie, tendance), chacune comparée à la moyenne nationale et
+    colorée par tonalité.
+  </figcaption>
+</figure>
+
+<!-- ======================= IV. JUSTIFICATION ======================= -->
+<h2 id="s4">IV. Justification des règles métier : pourquoi ces choix&nbsp;?</h2>
+<p>
+  Au-delà du <i>comment</i> (annexe en fin de rapport), chaque règle a été retenue pour trois qualités :
+  rester <b>lisible</b> pour un non-expert, <b>robuste</b> aux défauts des données ouvertes, et
+  <b>comparable</b> d'une commune à l'autre. Pour chacune, on explicite l'<b>alternative écartée</b> et
+  la raison.
+</p>
+
+<!-- IV.1 -->
+<h3 id="s4-1">IV.1 Prix médian &amp; filtrage DVF</h3>
+<p class="rulename">Médiane, pas moyenne.</p>
+<p class="why">les prix immobiliers forment une distribution <b>asymétrique à droite</b> (quelques
+  ventes de luxe). La médiane (la valeur du milieu : autant de ventes en dessous qu'au-dessus)
+  reflète la transaction <i>typique</i> que rencontrera l'acheteur.</p>
+<p class="alt">la moyenne, tirée vers le haut par les biens d'exception, gonfle le prix « normal » et
+  fausse la comparaison entre communes.</p>
+
+<p class="rulename">Bornes anti-aberrant <code>[500 ; 20 000]</code> €/m².</p>
+<p class="why">DVF contient des erreurs de saisie et des mutations non-standard (parkings, dépendances)
+  aux €/m² absurdes ; des bornes fixes les écartent de façon <b>stable et reproductible</b>.</p>
+<p class="alt">un filtrage statistique par commune (IQR / z-score) serait instable sur les communes à
+  faible volume de ventes et moins auditable.</p>
+
+<p class="rulename">Filtre « mono-bien ».</p>
+<p class="why">une mutation peut regrouper plusieurs lots (vente d'immeuble) : son €/m² global n'a pas
+  de sens. On ne garde que les ventes d'un <b>logement unique</b>, seules réellement comparables.</p>
+<p class="alt">diviser la valeur totale par la surface d'une vente multi-lots injecterait un prix au m²
+  bruité et biaisé.</p>
+
+<!-- IV.2 -->
+<h3 id="s4-2">IV.2 Abordabilité (années de revenu, classes)</h3>
+<p class="rulename">Logement type fixe de 70 m².</p>
+<p class="why">figer la taille du « panier » rend les communes comparables sur un <b>même bien de
+  référence</b> (≈ 2-3 pièces, cible d'un jeune ménage).</p>
+<p class="alt">indexer sur la surface médiane <i>locale</i> mélangerait « moins cher » et « plus
+  petit », cassant la comparabilité inter-communes.</p>
+
+<p class="rulename">Années de revenu = <code>prix_m2 × 70 / revenu_median</code>.</p>
+<p class="why">« combien d'années de revenu pour un logement type » est <b>intuitif et sans
+  hypothèse</b> de taux ni de durée de prêt : donc explicable et stable dans le temps.</p>
+<p class="alt">un taux d'effort mensuel (mensualité ÷ revenu) dépendrait du taux d'intérêt et de la
+  durée du prêt : plus fragile, daté, et moins pédagogique.</p>
+
+<p class="rulename">Seuils <code>7 / 12 / 18</code> ans.</p>
+<p class="why">ancrés sur des repères d'accession réels : &lt;7 finançable confortablement, 7-12
+  territoire d'un prêt standard (20-25 ans, effort tenable), 12-18 tendu, ≥18 hors de portée pour un
+  jeune acheteur. Des seuils <b>absolus</b> donnent une lecture stable dans le temps et l'espace.</p>
+<p class="alt">des classes par quantiles de la distribution ne seraient pas comparables d'une année ou
+  d'une région à l'autre, et « 3ᵉ quartile » ne parle pas à un acheteur.</p>
+
+<!-- IV.3 -->
+<h3 id="s4-3">IV.3 Transport &amp; équipements</h3>
+<p class="rulename">Desserte 100 / 80 / 55 / 10 + pénalité au-delà de 2 km.</p>
+<p class="why">barème <b>non-linéaire</b> : l'écart hub ↔ bien desservie est faible, mais « non
+  desservie » est quasi rédhibitoire pour un jeune actif sans voiture. Le seuil de 2 km ≈ distance à
+  pied/vélo raisonnable vers la gare.</p>
+<p class="alt">un espacement linéaire égal traiterait « non desservie » comme un simple cran de moins ;
+  ignorer la distance ferait scorer pareil deux communes « desservies » avec une gare à 0,2 km et à
+  3 km.</p>
+
+<p class="rulename">Niveau d'équipement 100 / 75 / 50 / 20.</p>
+<p class="why">classes dérivées des comptages BPE, avec un <b>plancher bas (20)</b> qui marque nettement
+  une commune sous-équipée dans le score.</p>
+<p class="alt">le comptage brut d'équipements n'est pas normalisé (une grande ville domine
+  mécaniquement) et n'est pas combinable aux autres notes.</p>
+
+<!-- IV.4 -->
+<h3 id="s4-4">IV.4 Score de correspondance</h3>
+<p class="rulename">Moyenne pondérée par curseurs, dimensions manquantes exclues.</p>
+<p class="why">l'arbitrage (budget vs transport…) <b>appartient à l'utilisateur</b> ; exclure une
+  dimension sans donnée évite de pénaliser une commune pour un simple trou de données.</p>
+<p class="alt">des poids fixes ne seraient pas personnels (contraire à la « carte à son image ») ;
+  imputer les valeurs manquantes introduirait un biais silencieux.</p>
+
+<p class="rulename">Jeunes actifs : 50 % → 0, 85 % → 100.</p>
+<p class="why">bornes plausibles de la part active : en-dessous de 50 % la zone vieillit, 85 % = très
+  jeune/active. Un rescale linéaire entre ces bornes donne une note 0-100 <b>combinable</b>.</p>
+<p class="alt">le pourcentage brut n'est pas normalisé et ne se combine pas aux trois autres notes.</p>
+
+<!-- IV.5 -->
+<h3 id="s4-5">IV.5 Analyse textuelle : règles plutôt que LLM</h3>
+<p class="rulename">Moteur à seuils + gabarits, déterministe.</p>
+<p class="why">reproductible (même entrée → même texte), <b>explicable et auditable</b>, sans
+  hallucination ni coût/latence d'API : indispensable pour un rendu où chaque phrase doit être
+  justifiable.</p>
+<p class="alt">une génération par LLM serait non-déterministe, risquerait d'inventer des chiffres, et
+  serait plus difficile à défendre et à reproduire.</p>
+
+<!-- ======================= V. ARCHITECTURE ======================= -->
+<h2 id="s6">V. Architecture technique &amp; stack</h2>
+<p class="lead">
+  HOMEPEDIA repose sur une <b>architecture médaillon</b> (Bronze → Silver → Gold) : chaque
+  couche a une responsabilité unique, ce qui rend la chaîne rejouable, testable et
+  découplée. Un plan de <b>service</b> (API + front) est séparé du plan de <b>calcul</b>
+  (Spark), pour maîtriser les coûts et la charge.
+</p>
+<p>
+  <b>En clair.</b> Imaginez une chaîne de raffinage : on collecte des matériaux
+  <i>bruts</i> (Bronze), on les <i>nettoie et les met en forme</i> (Silver), puis on
+  prépare des <i>produits finis prêts à consommer</i> (Gold). Le site web ne fait que
+  « lire » ces produits finis déjà préparés, ce qui le rend rapide.
+</p>
+
+<figure>
+  <img src="img/architecture.png" alt="Schéma d'ensemble de l'architecture HOMEPEDIA : sources, médaillon Bronze/Silver/Gold, cache, API, frontend">
+  <figcaption>
+    <b>Fig. 4 : Architecture d'ensemble.</b> De gauche à droite : les sources de données
+    ouvertes, la couche Bronze (stockage brut), la couche Silver (nettoyage par Spark), la
+    couche Gold (base PostgreSQL), le cache Redis, l'API et le frontend — le tout piloté en
+    haut par l'orchestrateur Airflow.
+  </figcaption>
+</figure>
+
+<div class="box">
+  <div class="box-title">Glossaire express (pour lecteur non technique)</div>
+  <ul>
+    <li><b>Architecture médaillon</b> : on raffine la donnée en 3 niveaux de qualité
+      croissante (Bronze → Silver → Gold), comme un minerai que l'on affine.</li>
+    <li><b>Bronze / Silver / Gold</b> : donnée <i>brute</i> / <i>nettoyée</i> /
+      <i>prête à l'emploi</i>.</li>
+    <li><b>Object store (S3)</b> : un très grand disque de stockage en ligne pour fichiers.</li>
+    <li><b>ETL</b> : « Extraire, Transformer, Charger » — la chaîne de préparation de la donnée.</li>
+    <li><b>Spark</b> : un moteur qui traite de gros volumes en les découpant en morceaux.</li>
+    <li><b>Parquet</b> : un format de fichier compact et rapide à relire.</li>
+    <li><b>Agrégat</b> : des chiffres calculés d'avance (médianes, comptages par commune).</li>
+    <li><b>API</b> : la « prise » par laquelle le site récupère les données.</li>
+    <li><b>Cache (Redis)</b> : une mémoire ultra-rapide qui garde les réponses fréquentes.</li>
+    <li><b>DAG / Airflow</b> : un chef d'orchestre qui lance les tâches dans le bon ordre, à heure fixe.</li>
+    <li><b>Conteneur (Docker)</b> : une « boîte » qui embarque l'appli et tout son nécessaire, identique partout.</li>
+    <li><b>CI/CD</b> : l'automatisation qui teste et met en ligne le code à chaque modification.</li>
+  </ul>
+</div>
+
+<h3 id="s6-1">V.1 Vue d'ensemble &amp; pipeline médaillon</h3>
+<ul class="axes">
+  <li><b>Bronze</b> : la donnée brute des sources ouvertes est déposée telle quelle sur un
+    <b>object store S3</b> (MinIO en dev, S3 en prod). Source de vérité rejouable : on
+    relance tout le pipeline sans re-télécharger.</li>
+  <li><b>Silver</b> : <b>Spark</b> nettoie, filtre les aberrations, normalise et écrit du
+    <b>Parquet</b> colonne (une ligne par entité : commune, gare, équipement…).</li>
+  <li><b>Gold</b> : des <b>agrégats par commune × année</b> pré-calculés dans
+    <b>PostgreSQL</b>, en 4 schémas (<code>market</code>, <code>demographics</code>,
+    <code>mobility</code>, <code>services</code>). L'API lit ce Gold directement : aucun
+    calcul à la requête.</li>
+</ul>
+
+<h3 id="s6-2">V.2 La stack, brique par brique</h3>
+<table>
+  <thead><tr><th>Brique</th><th>Techno</th><th>Rôle &amp; justification</th></tr></thead>
+  <tbody>
+    <tr><td><span class="m">Object store</span></td><td>MinIO / S3</td><td>Stockage Bronze/Silver ; API S3 standard, découplée du calcul.</td></tr>
+    <tr><td><span class="m">Traitement</span></td><td>Apache Spark 3.5</td><td>Nettoyage distribué du Silver ; encaisse la volumétrie DVF (millions de lignes).</td></tr>
+    <tr><td><span class="m">Gold servi</span></td><td>PostgreSQL 16</td><td>Relationnel + JSON ; Gold pré-agrégé donc léger : simplicité d'exploitation (plutôt qu'une base OLAP).</td></tr>
+    <tr><td><span class="m">Cache</span></td><td>Redis 7</td><td>Met en cache les réponses API les plus lues (carte France).</td></tr>
+    <tr><td><span class="m">API</span></td><td>FastAPI</td><td>Lecture seule du Gold ; documentation OpenAPI automatique.</td></tr>
+    <tr><td><span class="m">Frontend</span></td><td>Next.js 16</td><td>Carte + tableaux de bord ; rendu serveur, comptes gérés côté front.</td></tr>
+    <tr><td><span class="m">Orchestration</span></td><td>Apache Airflow 2.10</td><td>3 DAGs mensuels, dépendances explicites, tests de qualité des données, retries.</td></tr>
+    <tr><td><span class="m">Calcul à la demande</span></td><td>GCP Compute Engine</td><td>VM Spark allumée/éteinte par Airflow : on ne paie que pendant les runs.</td></tr>
+    <tr><td><span class="m">Gouvernance</span></td><td>OpenMetadata</td><td>Catalogue + lignage des jeux de données.</td></tr>
+    <tr><td><span class="m">Livraison</span></td><td>GitHub Actions + GHCR</td><td>Build/push de 4 images, déploiement automatisé du VPS.</td></tr>
+    <tr><td><span class="m">Reverse-proxy</span></td><td>Caddy</td><td>HTTPS automatique (Let's Encrypt) devant l'API et le front.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s6-3">V.3 Orchestration, exécution &amp; déploiement</h3>
+<p>
+  <b>Airflow</b> (sur le VPS) orchestre trois DAGs mensuels — <code>housing_etl</code>,
+  <code>mobility_etl</code>, <code>amenities_etl</code> — chacun enchaînant <i>ingestion :
+  Bronze→Silver : Silver→Gold : contrôle qualité : rafraîchissement du cache</i>. Pour le
+  calcul lourd, Airflow <b>démarre une VM Spark sur GCP</b> avant le run, y exécute les
+  <code>spark-submit</code> par SSH — <b>un job à la fois</b> pour ne pas saturer la
+  machine — puis <b>éteint la VM</b> (même en cas d'échec).
+</p>
+<p>
+  En production, tout est conteneurisé. Un <b>VPS</b> héberge le plan de service (Caddy,
+  API, front, Redis, Airflow) ; la <b>VM GCP</b> héberge le plan de calcul (Spark). La
+  <b>CI/CD GitHub Actions</b> construit et publie quatre images sur GHCR, puis met à jour
+  le VPS. Les secrets ne sont jamais dans le code (injectés au déploiement).
+</p>
+
+<!-- ======================= VI. MÉTHODOLOGIE ======================= -->
+<h2 id="s7">VI. Méthodologie</h2>
+<p class="lead">
+  Le projet a été mené de façon <b>incrémentale, domaine par domaine</b> : plutôt que de
+  tout ingérer d'un coup, on a livré une première verticale complète (prix DVF), puis
+  répliqué le schéma aux autres domaines (transport, services, démographie).
+</p>
+
+<h3 id="s7-1">VI.1 Démarche projet</h3>
+<ul class="axes">
+  <li><b>Verticale d'abord</b> : une source menée de bout en bout (Bronze → Gold → API →
+    front) avant d'élargir, pour valider l'architecture tôt.</li>
+  <li><b>Réplication</b> : chaque nouveau domaine réutilise le même patron de pipeline
+    (mêmes opérateurs Airflow, même structure Silver/Gold).</li>
+  <li><b>Dev/prod symétriques</b> : le même code tourne en local (conteneur Spark) et en
+    prod (VM GCP) ; la bascule est isolée dans un module, pas dispersée dans les DAGs.</li>
+</ul>
+
+<h3 id="s7-2">VI.2 Acquisition &amp; traitement des données</h3>
+<p>
+  Les sources sont toutes <b>publiques</b> (DVF, INSEE FiLoSoFi / recensement / BPE, SNCF).
+  L'<b>ingestion</b> dépose le brut en Bronze ; le <b>nettoyage Silver</b> applique les
+  règles métier justifiées en section IV (bornes anti-aberrantes, filtre mono-bien,
+  médiane…) ; l'<b>agrégation Gold</b> pré-calcule les indicateurs par commune × année.
+  Des scripts de <b>backfill</b> permettent de (re)charger un millésime à la demande.
+</p>
+
+<h3 id="s7-3">VI.3 Qualité &amp; gouvernance</h3>
+<ul class="axes">
+  <li><b>Tests de qualité des données</b> : des règles déclaratives (YAML) — complétude, plages de
+    valeurs, fraîcheur — vérifiées dans les DAGs. Une règle critique qui casse <b>fait
+    échouer</b> le run : pas de donnée fausse publiée en Gold.</li>
+  <li><b>Lignage</b> : OpenMetadata catalogue les jeux de données et trace le parcours
+    source → Silver → Gold.</li>
+  <li><b>Reproductibilité</b> : le pipeline est conçu pour que <i>les mêmes entrées
+    produisent toujours les mêmes sorties</i> — condition indispensable pour auditer un
+    résultat et le défendre. Plusieurs choix y concourent :
+    <ul>
+      <li><b>Règles déterministes</b> : bornes fixes (<code>[500 ; 20 000]</code>), seuils
+        absolus (7 / 12 / 18 ans), logement type de 70 m² — aucun calcul ne dépend d'un
+        tirage aléatoire ni de la distribution locale du moment.</li>
+      <li><b>Bronze immuable</b> : la donnée brute est stockée telle quelle et n'est jamais
+        modifiée ; on peut rejouer tout le pipeline à l'identique depuis cette source de
+        vérité.</li>
+      <li><b>Millésimes explicites</b> : chaque exécution cible une année précise
+        (paramètre <code>year</code>), donc on régénère exactement le Gold d'un millésime
+        donné, sans ambiguïté sur les données utilisées.</li>
+      <li><b>Environnement figé</b> : les mêmes images Docker (versions verrouillées de
+        Spark, Python et des librairies) tournent en dev et en prod — pas de dérive liée à
+        la machine ou à une mise à jour d'outil.</li>
+      <li><b>Code versionné</b> : toute la logique de transformation est sous Git ; un même
+        commit régénère le même résultat, et on peut remonter à la version exacte qui a
+        produit une donnée.</li>
+      <li><b>Analyse textuelle sans IA</b> : le moteur à règles garantit qu'une même commune
+        donne toujours le même texte (contrairement à un LLM, non déterministe).</li>
+    </ul>
+  </li>
+</ul>
+
+<h3 id="s7-4">VI.4 Outils &amp; collaboration</h3>
+<ul class="axes">
+  <li><b>Versioning &amp; CI</b> : Git + GitHub Actions (lint, build, déploiement).</li>
+  <li><b>Reproductibilité d'environnement</b> : tout est conteneurisé (Docker Compose en
+    dev, images publiées en prod) ; un <code>taskfile</code> raccourcit les commandes
+    courantes.</li>
+  <li><b>Secrets</b> : hors du code (<code>.env</code> gitignoré en dev, secrets GitHub
+    injectés en prod).</li>
+</ul>
+
+<!-- ======================= VII. ANNEXE ======================= -->
+<h2 id="s5">VII. Annexe : Comment chaque métrique est calculée</h2>
+<table>
+  <thead>
+    <tr><th>Métrique</th><th>Calcul</th><th>Source · Millésime</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="m">Prix médian au m²</span><br><code>prix_m2_median</code></td>
+      <td>Filtre « mono-bien », puis <code>prix_m2 = valeur_fonciere / surface_reelle_bati</code>,
+        bornes anti-aberrant <code>[500 ; 20 000]</code> €, puis <b>médiane</b> par commune × année.</td>
+      <td>DVF (Etalab) · 2021/2022/2024</td>
+    </tr>
+    <tr>
+      <td><span class="m">Années de revenu</span><br><code>affordability_years</code></td>
+      <td><code>prix_m2 × 70 / revenu_median</code> : nombre d'années de revenu médian pour un logement
+        type de 70 m².</td>
+      <td>DVF × FiLoSoFi · revenu 2023</td>
+    </tr>
+    <tr>
+      <td><span class="m">m² par an</span><br><code>m2_par_an</code></td>
+      <td><code>revenu_median / prix_m2</code> : m² achetables avec un an de revenu médian.</td>
+      <td>DVF × FiLoSoFi</td>
+    </tr>
+    <tr>
+      <td><span class="m">Classe d'abordabilité</span><br><code>affordability_class</code></td>
+      <td>Seuils sur les années de revenu : Très abordable &lt;7 · Abordable 7–12 · Tendu 12–18 ·
+        Très tendu ≥18.</td>
+      <td>Dérivé de <code>affordability_years</code></td>
+    </tr>
+    <tr>
+      <td><span class="m">Desserte</span><br><code>desserte_class</code></td>
+      <td>Segment SNCF de la gare (A = Hub majeur, B = Bien desservie, C = Desservie) ; sans gare → Non
+        desservie + distance haversine (à vol d'oiseau) à la plus proche.</td>
+      <td>SNCF open data · 2024</td>
+    </tr>
+    <tr>
+      <td><span class="m">Niveau d'équipement</span><br><code>niveau_equipement</code></td>
+      <td>Dérivé des comptages d'équipements (Santé, Commerces, Enseignement, Supermarchés…) par
+        commune → Sous-équipée … Très équipée.</td>
+      <td>BPE (INSEE)</td>
+    </tr>
+    <tr>
+      <td><span class="m">Structure par âge</span><br><code>pct_moins25 / 25_64 / 65plus</code></td>
+      <td>Parts (%) de tranches d'âge disjointes, agrégées en 3 classes.</td>
+      <td>Recensement INSEE · 2022</td>
+    </tr>
+    <tr>
+      <td><span class="m">Score de correspondance</span><br>(calculé côté front)</td>
+      <td>Moyenne pondérée de 4 notes 0–100 (budget, transport, services, jeunes actifs) par les
+        curseurs d'importance de l'utilisateur : détail et exemple dans l'encadré « pas à pas » (III.1).</td>
+      <td>Front · <code>scoring.ts</code></td>
+    </tr>
+    <tr>
+      <td><span class="m">Variation mensuelle (Δ)</span></td>
+      <td>Écart en % entre les deux derniers mois disponibles de la série de tendance.</td>
+      <td>DVF (trend mensuel)</td>
+    </tr>
+  </tbody>
+</table>
+
+<p class="src">
+  Les métriques catégorielles (abordabilité, desserte, équipement, démographie) sont pré-calculées dans
+  la couche Gold et lues par l'API ; le score de correspondance et les variations sont calculés côté
+  front.<br>
+  <b>Sources :</b> <code>docs/fiche_ville.md</code>, <code>docs/silver_dvf_logic.md</code>,
+  <code>frontend/src/lib/scoring.ts</code>, <code>analysis.ts</code>, <code>map-modes.ts</code>.<br>
+  HOMEPEDIA · Epitech T-DAT-902.
+</p>
+
+</body>
+</html>

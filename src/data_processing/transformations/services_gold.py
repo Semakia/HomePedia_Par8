@@ -16,7 +16,6 @@ import os
 
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
-
 from src.data_processing.utils.spark_utils import build_s3a_uri, build_spark
 
 # BPE domain code -> Gold column. _T (total) is excluded upstream.

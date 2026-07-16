@@ -20,7 +20,6 @@ import os
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-
 from src.data_processing.utils.spark_utils import build_s3a_uri, build_spark
 
 DATASET = "dvf"

@@ -19,6 +19,6 @@ class Page(BaseModel, Generic[T]):
     pages: int
 
     @classmethod
-    def build(cls, items: list[T], total: int, page: int, size: int) -> "Page[T]":
+    def build(cls, items: list[T], total: int, page: int, size: int) -> Page[T]:
         pages = (total + size - 1) // size if size else 0
         return cls(items=items, total=total, page=page, size=size, pages=pages)

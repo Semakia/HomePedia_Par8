@@ -22,7 +22,7 @@ import hashlib
 import os
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 from dotenv import load_dotenv
@@ -136,7 +136,7 @@ class DVFConnector:
             "bytes": result.bytes,
             "sha256": result.sha256,
             "content_type": result.content_type,
-            "ingested_at": datetime.now(timezone.utc).isoformat(),
+            "ingested_at": datetime.now(UTC).isoformat(),
         }
 
         try:

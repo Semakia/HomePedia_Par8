@@ -19,7 +19,6 @@ import argparse
 import os
 
 from pyspark.sql import functions as F
-
 from src.data_processing.transformations.insee_etl import (
     _bronze_input,
     read_bronze,

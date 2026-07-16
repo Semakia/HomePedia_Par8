@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-
 from src.api.deps import get_city_service
 from src.api.schemas.city import CityDetail, CityMetrics
 from src.api.schemas.common import Page

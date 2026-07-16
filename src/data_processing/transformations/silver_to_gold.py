@@ -19,7 +19,6 @@ import os
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-
 from src.data_processing.utils.spark_utils import build_s3a_uri, build_spark
 
 # INSEE region code -> human-readable name (the API/frontend wants the label).
@@ -45,6 +44,13 @@ def _jdbc_props() -> tuple[str, dict]:
         "driver": "org.postgresql.Driver",
         # let Postgres coerce strings into varchar/text without explicit casts
         "stringtype": "unspecified",
+        # Fail fast instead of hanging: the overwrite issues TRUNCATE, which needs
+        # an ACCESS EXCLUSIVE lock. If the API (or an orphaned session) holds a
+        # conflicting lock, cap the wait to 60s -> the write errors out in a
+        # minute rather than blocking the job (and the SSH session) for hours.
+        "options": "-c lock_timeout=60000",
+        # Give up on an unreachable Postgres in 10s rather than the OS default.
+        "connectTimeout": "10",
     }
     return url, props
 
@@ -382,7 +388,8 @@ def build_demographics(demo: DataFrame) -> DataFrame:
         .groupBy("code_insee", "year")
         .agg(
             F.sum(F.when(is_total, pop).otherwise(0)).alias("total"),
-            F.sum(F.when(is_total & F.col("age_band").isin(young), pop).otherwise(0)).alias("young"),
+            F.sum(F.when(is_total & F.col("age_band").isin(young), pop).otherwise(0))
+            .alias("young"),
             F.sum(F.when(is_total & F.col("age_band").isin(mid), pop).otherwise(0)).alias("mid"),
             F.sum(F.when(is_total & F.col("age_band").isin(old), pop).otherwise(0)).alias("old"),
             F.sum(F.when(F.col("sex") == "F", pop).otherwise(0)).alias("femmes"),

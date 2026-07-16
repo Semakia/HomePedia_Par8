@@ -1,7 +1,9 @@
-import os
-import requests
 import json
+import os
+
+import requests
 from dotenv import load_dotenv
+
 
 def test_oauth2_flow(client_id, client_secret):
     """

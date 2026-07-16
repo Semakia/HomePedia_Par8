@@ -24,7 +24,6 @@ from pyspark.sql.types import (
     StructField,
     StructType,
 )
-
 from src.data_processing.utils.spark_utils import build_s3a_uri, build_spark
 
 DATASET = "bpe"
@@ -86,7 +85,8 @@ def read_bronze(spark: SparkSession, path: str) -> DataFrame:
 def transform(df: DataFrame) -> DataFrame:
     """
     Transform the raw BPE DataFrame into a flat table of counts per commune × facility type.
-    Asserts that the input DataFrame has the expected schema and filters out rows with null observations.
+    Asserts that the input DataFrame has the expected schema and filters out
+    rows with null observations.
     Args:
         df (DataFrame): The input DataFrame containing the raw BPE data.
     Returns:

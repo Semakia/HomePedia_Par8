@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
-import pytest
-import requests
 
-from src.data_ingestion.loaders.s3_loader import bronze_key
 from src.data_ingestion.sources.insee_connector import InseeConnector
 
 

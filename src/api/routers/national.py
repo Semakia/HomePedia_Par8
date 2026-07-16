@@ -7,7 +7,6 @@ per-city stats page unchanged. See NationalService for the weighting caveats.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response
-
 from src.api.deps import get_national_service
 from src.api.schemas.city import CityDetail
 from src.api.schemas.common import Page

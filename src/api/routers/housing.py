@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
-
 from src.api.deps import get_housing_service
 from src.api.schemas.common import Page
 from src.api.schemas.housing import HousingPriceByType

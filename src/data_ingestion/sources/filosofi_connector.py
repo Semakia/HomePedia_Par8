@@ -26,7 +26,7 @@ import json
 import os
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 from src.data_ingestion.loaders.s3_loader import S3Loader, bronze_key
@@ -199,7 +199,7 @@ class FilosofiConnector:
             "bytes": file_size,
             "sha256": sha256,
             "content_type": content_type,
-            "ingested_at": datetime.now(timezone.utc).isoformat(),
+            "ingested_at": datetime.now(UTC).isoformat(),
         }
 
         try:
@@ -220,8 +220,12 @@ class FilosofiConnector:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ingest INSEE FiLoSoFi income data into Bronze S3.")
-    parser.add_argument("--year", type=int, default=LATEST_VINTAGE, help="Vintage year (latest = 2023)")
+    parser = argparse.ArgumentParser(
+        description="Ingest INSEE FiLoSoFi income data into Bronze S3."
+    )
+    parser.add_argument(
+        "--year", type=int, default=LATEST_VINTAGE, help="Vintage year (latest = 2023)"
+    )
     parser.add_argument("--departement", type=str, required=True, help="2- or 3-char dept code")
     parser.add_argument("--overwrite", action="store_true", help="Re-land even if present")
     args = parser.parse_args()

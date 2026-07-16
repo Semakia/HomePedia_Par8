@@ -30,7 +30,7 @@ class CityService:
     def __init__(
         self,
         repo: CityRepository,
-        cache: "redis.Redis | None" = None,
+        cache: redis.Redis | None = None,
     ) -> None:
         self.repo = repo
         self.cache = cache

@@ -22,7 +22,7 @@ import os
 import tempfile
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 from src.data_ingestion.loaders.s3_loader import S3Loader, bronze_key
@@ -71,7 +71,10 @@ class InseeConnector:
         """
         Query geo.api.gouv.fr to list all communes in a given department with their metadata.
         """
-        url = f"{GEO_API_URL}/departements/{departement}/communes?fields=code,nom,codeDepartement,codeRegion"
+        url = (
+            f"{GEO_API_URL}/departements/{departement}/communes"
+            "?fields=code,nom,codeDepartement,codeRegion"
+        )
         log.info("insee.geo_api.start", departement=departement, url=url)
         resp = requests.get(url, timeout=15)
         resp.raise_for_status()
@@ -230,7 +233,7 @@ class InseeConnector:
             "bytes": file_size,
             "sha256": sha256,
             "content_type": content_type,
-            "ingested_at": datetime.now(timezone.utc).isoformat(),
+            "ingested_at": datetime.now(UTC).isoformat(),
         }
 
         # 4. Upload to Bronze S3

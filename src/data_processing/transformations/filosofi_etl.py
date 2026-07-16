@@ -26,7 +26,6 @@ from pyspark.sql.types import (
     StructField,
     StructType,
 )
-
 from src.data_processing.utils.spark_utils import build_s3a_uri, build_spark
 
 DATASET = "filosofi"

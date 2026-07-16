@@ -36,7 +36,7 @@ class NationalService:
         self,
         city_repo: CityRepository,
         housing_repo: HousingRepository,
-        cache: "redis.Redis | None" = None,
+        cache: redis.Redis | None = None,
     ) -> None:
         self.city_repo = city_repo
         self.housing_repo = housing_repo

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 import requests
-
 from src.data_ingestion.loaders.s3_loader import bronze_key
 from src.data_ingestion.sources.dvf_connector import DVFConnector
 from src.data_ingestion.utils.retry_logic import retry

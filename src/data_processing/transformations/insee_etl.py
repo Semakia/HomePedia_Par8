@@ -87,7 +87,9 @@ def _bronze_input(
     departement: str | None
 ) -> str:
     if departement:
-        return build_s3a_uri(bucket, f"{DATASET}/year={year}/departement={departement}/population.json")
+        return build_s3a_uri(
+            bucket, f"{DATASET}/year={year}/departement={departement}/population.json"
+        )
     return build_s3a_uri(bucket, f"{DATASET}/year={year}/departement=*/population.json")
 
 
@@ -198,8 +200,10 @@ def run(
     # Melodi API contains data up to 2022. Fallback to 2022 if a later year is requested.
     actual_year = min(year, 2022)
     if year > 2022:
-        print(f"[silver-insee] Requested year {year} is greater than 2022. Falling back to Bronze year {actual_year}.")
-
+        print(
+            f"[silver-insee] Requested year {year} is greater than 2022. "
+            f"Falling back to Bronze year {actual_year}."
+        )
     src_path = _bronze_input(bronze_bucket, actual_year, departement)
     dst_path = build_s3a_uri(silver_bucket, DATASET)
     print(f"[silver-insee] read  {src_path}")

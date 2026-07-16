@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from src.api.config import get_settings
 from src.api.dependencies import ping_postgres, ping_redis, ping_s3
 from src.api.routers import arrondissements, cities, housing, mobility, national

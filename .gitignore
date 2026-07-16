@@ -2,6 +2,18 @@
 .env
 .env.local
 *.local
+# Real per-infra prod secrets (templates *.example stay tracked).
+.env.prod
+**/.env.prod
+
+# Prod deploy secrets: GCP ADC (user refresh token) + SSH keys for the Spark VM.
+iac/docker/prod/**/secrets/
+*adc*.json
+airflow_spark_vm
+airflow_spark_vm.pub
+
+# --- Claude Code ---
+CLAUDE.md
 
 # --- Claude Code ---
 CLAUDE.md

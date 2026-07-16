@@ -1,6 +1,6 @@
-from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from src.data_processing.utils.spark_utils import build_spark
+
 
 def main():
     spark = build_spark("inspect-spark")

@@ -5,7 +5,7 @@ Pipeline: ingest_sncf -> bronze_to_silver_sncf -> mobility_to_gold -> quality
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
