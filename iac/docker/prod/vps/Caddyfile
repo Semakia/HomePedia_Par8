@@ -1,0 +1,24 @@
+# Caddy reverse proxy pour le VPS HOMEPEDIA. HTTPS automatique (Let's Encrypt).
+# Domaines injectés depuis l'environnement compose (APP_/API_/AIRFLOW_DOMAIN).
+{
+	email {$CADDY_EMAIL}
+}
+
+# Frontend (Next.js).
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}
+
+# Gold API (FastAPI). CORS géré par l'app ; Caddy forwarde + TLS.
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8000
+}
+
+# UI Airflow (optionnelle). Ne s'active que si AIRFLOW_DOMAIN est défini ;
+# sinon Caddy ignore ce bloc (site au nom vide). Airflow a sa propre auth.
+{$AIRFLOW_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy airflow-webserver:8080
+}

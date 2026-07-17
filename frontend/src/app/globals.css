@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+/* Design tokens extracted from the Homepedia Figma mockup. */
+@theme {
+  --color-bg: #f4f5f9;
+  --color-sidebar: #ffffff;
+  --color-card: #ffffff;
+  --color-primary: #5d5fef;
+  --color-primary-soft: #eef0ff;
+  --color-ink: #1a1d2e;
+  --color-muted: #8a8f9c;
+  --color-line: #eceef3;
+  --color-success: #22c55e;
+
+  --font-sans: var(--font-inter);
+}
+
+/* Enables `dark:` utilities while we mainly rely on the token overrides below. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Night mode — overrides the design tokens so every token-based component
+   (bg-bg, text-ink, bg-card, border-line…) flips automatically. */
+.dark {
+  --color-bg: #13151c;
+  --color-sidebar: #1b1e27;
+  --color-card: #1b1e27;
+  --color-primary: #7c7eff;
+  --color-primary-soft: #262a3d;
+  --color-ink: #e7e9f0;
+  --color-muted: #9aa0b0;
+  --color-line: #2a2e3b;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+/* Interface density — Tailwind v4 spacing/typography is rem-based, so scaling
+   the root font-size compacts the whole UI uniformly. */
+:root {
+  font-size: 100%;
+}
+html[data-density="compact"] {
+  font-size: 87.5%;
+}
+
+/* Data-source badge visibility (toggled from Paramètres). */
+html[data-badge="off"] .data-source-badge {
+  display: none;
+}
+
+/* --- Page transitions ------------------------------------------------------
+   Subtle fade-in replayed on every navigation via src/app/template.tsx.
+   Opacity only (no transform) so the Leaflet map isn't disturbed. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-page-in {
+  animation: page-in 200ms ease-out;
+}
+
+/* Indeterminate navigation progress bar (shown by the sidebar link that is
+   pending — see NavPending in src/components/sidebar.tsx). */
+@keyframes nav-progress {
+  0% {
+    left: -40%;
+    width: 40%;
+  }
+  50% {
+    width: 40%;
+  }
+  100% {
+    left: 100%;
+    width: 40%;
+  }
+}
+.nav-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 3000;
+  height: 2px;
+  background: var(--color-primary);
+  animation: nav-progress 1s ease-in-out infinite;
+}
+
+/* Respect users who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-in {
+    animation: none;
+  }
+  .nav-progress-bar {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+
+/* Map cluster bubble label: strip Leaflet's tooltip chrome so only the count
+   shows, centered over the bubble. */
+.leaflet-tooltip.cluster-label {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 0;
+  pointer-events: none;
+}
+.leaflet-tooltip.cluster-label::before {
+  display: none; /* hide the tooltip arrow */
+}

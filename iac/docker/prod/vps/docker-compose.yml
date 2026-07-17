@@ -1,0 +1,206 @@
+# =============================================================================
+# HOMEPEDIA — PROD stack on the OVH VPS (serving plane + orchestration)
+# -----------------------------------------------------------------------------
+# Caddy · FastAPI · Next.js frontend · Redis ·
+# Airflow (webserver + scheduler + metadata Postgres).
+#
+# The Gold PostgreSQL is NOT in this stack: it reuses the EXISTING Postgres on
+# the host (already populated), published on the VPS :5432. The API reaches it
+# via host.docker.internal; Spark (on the GCP VM) via the VPS public IP.
+#
+# Spark does NOT run here either: the ETL runs on an on-demand GCP VM that
+# Airflow starts/stops (see iac/docker/prod/gcp-vm/). Airflow authenticates to
+# GCP with a mounted user ADC file (SA keys blocked by org policy) and SSHes in
+# to run spark-submit.
+#
+# Deploy:
+#   docker compose --env-file .env.prod -f docker-compose.yml pull
+#   docker compose --env-file .env.prod -f docker-compose.yml up -d
+# =============================================================================
+name: homepedia-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+# Shared base for the Airflow processes. They carry the GCP ADC + the SSH key to
+# reach the Spark VM; no Docker socket (Spark is remote now, driven over SSH).
+x-airflow-common: &airflow-common
+  image: ${IMAGE_REGISTRY}/homepedia-airflow:${IMAGE_TAG:-latest}
+  env_file:
+    - ../../../../.env.prod     # fichier unique à la racine du repo
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@airflow-db:5432/${AIRFLOW_DB:-airflow}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+    PYTHONPATH: /opt/airflow/dags:/opt/airflow
+    # --- GCP Spark VM control (used by utils/spark_ops.py) ---
+    SPARK_CONTAINER: homepedia-spark-master
+    SPARK_SSH_CONN_ID: spark_ssh            # its presence flips DAGs to remote
+    GCP_PROJECT: ${GCP_PROJECT}
+    GCP_ZONE: ${GCP_ZONE}
+    GCP_INSTANCE: ${GCP_INSTANCE}
+    # ADC (user refresh token) for the ComputeEngine start/stop operators.
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp/adc.json
+    # The ComputeEngine* operators need `google_cloud_default` to EXIST; an empty
+    # keyfile makes the hook fall back to ADC (GOOGLE_APPLICATION_CREDENTIALS).
+    AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT: "google-cloud-platform://"
+    # SSH connection to the Spark VM (key mounted read-only below).
+    AIRFLOW_CONN_SPARK_SSH: "ssh://${SPARK_SSH_USER}@${SPARK_SSH_HOST}:22/?key_file=%2Fopt%2Fairflow%2F.ssh%2Fspark_vm&no_host_key_check=true"
+  volumes:
+    - airflow_logs:/opt/airflow/logs
+    - ./secrets/adc.json:/opt/airflow/gcp/adc.json:ro
+    - ./secrets/spark_vm:/opt/airflow/.ssh/spark_vm:ro
+  logging: *default-logging
+
+services:
+  # --- Reverse proxy + HTTPS automatique -----------------------------------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      AIRFLOW_DOMAIN: ${AIRFLOW_DOMAIN:-}
+      CADDY_EMAIL: ${CADDY_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - frontend
+    logging: *default-logging
+
+  # NOTE: pas de service `postgres` ici — le Gold réutilise le PostgreSQL
+  # EXISTANT de l'hôte (déjà peuplé, publié sur le 5432 du VPS). L'API et Spark
+  # s'y connectent (API via host.docker.internal ; Spark via l'IP du VPS).
+
+  # --- Cache API (co-localisé avec l'API) ----------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+  # --- FastAPI (Gold API) ---------------------------------------------------
+  api:
+    image: ${IMAGE_REGISTRY}/homepedia-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - ../../../../.env.prod          # fichier unique à la racine du repo
+    environment:
+      # Gold = le Postgres EXISTANT de l'hôte, joint via la passerelle Docker.
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      GOLD_SCHEMA: ${GOLD_SCHEMA:-market}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+
+  # --- Next.js frontend (SQLite auth sur volume persistant) -----------------
+  frontend:
+    image: ${IMAGE_REGISTRY}/homepedia-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "file:/app/data/prod.db"
+      AUTH_SECRET: ${AUTH_SECRET}
+      # Auth.js v5 runs behind Caddy (reverse proxy terminating TLS). Without this
+      # it rejects the forwarded Host as untrusted -> "problem with the server
+      # configuration" on login/register. Required for any non-Vercel self-host.
+      AUTH_TRUST_HOST: "true"
+      SEED_ON_START: ${SEED_ON_START:-0}
+      # Server-side (SSR) API calls go over the Docker network, not the public
+      # URL (a container can't hairpin to the VPS's own public IP).
+      API_INTERNAL_URL: http://api:8000
+    volumes:
+      - frontend_data:/app/data
+    depends_on:
+      - api
+    logging: *default-logging
+
+  # --- Airflow metadata DB --------------------------------------------------
+  airflow-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow}
+      POSTGRES_DB: ${AIRFLOW_DB:-airflow}
+    volumes:
+      - airflow_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER:-airflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+  # --- Airflow bootstrap (migrate + admin) ---------------------------------
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate && \
+        airflow users create \
+          --username "${AIRFLOW_ADMIN_USER:-admin}" \
+          --password "${AIRFLOW_ADMIN_PASSWORD}" \
+          --firstname Admin --lastname User --role Admin \
+          --email admin@homepedia.local || true
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    environment:
+      <<: *airflow-env
+      AIRFLOW__WEBSERVER__BASE_URL: ${AIRFLOW_BASE_URL:-http://localhost:8080}
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    # Servi via Caddy (HTTPS sur AIRFLOW_DOMAIN) -> pas d'exposition publique du
+    # 8080 ; lié à localhost (accès direct possible via tunnel SSH au besoin).
+    ports:
+      - "127.0.0.1:${AIRFLOW_WEB_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  frontend_data:
+  caddy_data:
+  caddy_config:
+  airflow_pg:
+  airflow_logs:

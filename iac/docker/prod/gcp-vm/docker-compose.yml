@@ -1,0 +1,31 @@
+# =============================================================================
+# HOMEPEDIA — Spark on the on-demand GCP VM (data plane)
+# -----------------------------------------------------------------------------
+# One Spark container that Airflow (on the VPS) wakes up, SSHes into to run
+# `spark-submit --master local[*]`, then shuts down. `restart: always` + Docker
+# enabled at boot means the container comes back on its own every time the VM
+# starts. It reads sources from S3 (Bronze/Silver) and writes the Gold layer to
+# the PostgreSQL on the VPS (POSTGRES_HOST in .env.prod points at the VPS IP).
+#
+# One-time provisioning on the VM (see DEPLOYMENT.md):
+#   curl -fsSL https://get.docker.com | sudo sh
+#   docker login ghcr.io        # PAT read:packages
+#   docker compose --env-file .env.prod -f docker-compose.yml up -d
+# A startup-script re-pulls + up's on each boot so the VM always runs :latest.
+# =============================================================================
+name: homepedia-spark
+
+services:
+  spark-master:
+    image: ${IMAGE_REGISTRY}/homepedia-spark:${IMAGE_TAG:-latest}
+    restart: always                          # comes back when the VM reboots
+    container_name: homepedia-spark-master   # must match SPARK_CONTAINER on VPS
+    env_file:
+      - ../../../../.env.prod          # fichier unique à la racine du repo
+    environment:
+      SPARK_MODE: master
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }

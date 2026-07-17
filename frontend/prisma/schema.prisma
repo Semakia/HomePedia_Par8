@@ -1,0 +1,26 @@
+// Prisma schema — app-owned account store (front-owned auth).
+//
+// Deliberately SQLite + local file: authentication lives entirely inside the
+// Next.js app, with no dependency on the shared FastAPI API or the read-only
+// Gold Postgres (owned by the data team). Swapping to Postgres later is a
+// datasource change only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Prisma 7: connection URL lives in prisma.config.ts (CLI) and the driver
+  // adapter in src/lib/prisma.ts (runtime), not here.
+  provider = "sqlite"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  // SQLite has no native enum; role is validated in app code (see src/lib/auth-roles.ts).
+  role         String   @default("USER")
+  createdAt    DateTime @default(now())
+}
