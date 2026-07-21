@@ -8,32 +8,27 @@
 ![Spark](https://img.shields.io/badge/Apache%20Spark-3.5-E25A1C?logo=apachespark&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 
-**HOMEPEDIA** aide un jeune actif à décider **où acheter un bien en France**. La
-difficulté n'est pas le manque de données ouvertes, mais leur lecture : un prix au
-m² seul ne dit pas si un quartier est *abordable au regard des revenus*, *bien
-desservi*, *équipé* ou *peuplé de gens comme moi*. La plateforme croise ces axes et
-les traduit en une décision, sur une carte interactive et des tableaux de bord.
+**HOMEPEDIA** helps a young working professional decide where to buy property in France. The challenge lies not in a lack of open data, but in interpreting it: a price per square meter alone doesn't reveal whether a neighborhood is affordable relative to income, well-connected, well-equipped with amenities, or populated by people like me. The platform cross-references these factors and translates them into a decision, presented via an interactive map and dashboards.
 
-Le projet est bâti sur une **architecture médaillon** (Bronze → Silver → Gold),
-orchestrée par Airflow, exposée par une API FastAPI et consommée par un front
-Next.js.
+The project is built on a **medallion architecture** (Bronze → Silver → Gold),
+orchestrated by Airflow, exposed via a FastAPI API, and consumed by a
+Next.js frontend.
 
-> Projet Epitech **T-DAT-902** (« Big Data ») — groupe **PAR_5**.
-> Rapport détaillé (visualisations, métriques, règles métier) :
+> Detailed report (visualizations, metrics, business rules):
 > [docs/rapport/rapport-du-projet.pdf](docs/rapport/rapport-du-projet.pdf).
-> Schéma de flux : [docs/diagrams/data_flow_archi.png](docs/diagrams/data_flow_archi.png).
+> Data flow diagram  : [docs/diagrams/data_flow_archi.png](docs/diagrams/data_flow_archi.png).
 
-## Table des matières
+## Table of Contents
 
-- [Vue d'ensemble](#vue-densemble)
-- [Fonctionnalités](#fonctionnalites)
-- [Architecture et données](#architecture-et-donnees)
-- [Stack technique](#stack-technique)
-- [Démarrage rapide (dev)](#demarrage-rapide)
-- [Pipelines de données](#pipelines-de-donnees)
-- [Déploiement (prod)](#deploiement)
-- [Structure du dépôt](#structure-du-depot)
-- [Tests et qualité](#tests-et-qualite)
+- [Overview](#vue-densemble)
+- [Features](#fonctionnalites)
+- [Archtecture and data](#architecture-et-donnees)
+- [Technical stack](#stack-technique)
+- [Quick Start (dev)](#demarrage-rapide)
+- [Data pipelines](#pipelines-de-donnees)
+- [Deployments (prod)](#deploiement)
+- [Repository structure](#structure-du-depot)
+- [Quality and Tests](#tests-et-qualite)
 - [Documentation](#documentation)
 
 ---
@@ -42,103 +37,104 @@ Next.js.
 
 ## Vue d'ensemble
 
-HOMEPEDIA est une solution complète de traitement de données immobilières et
-territoriales : ingestion de plusieurs sources ouvertes, nettoyage distribué avec
-Spark, agrégation dans une couche Gold requêtable, le tout orchestré par Airflow et
-restitué dans une application web. L'objectif : transformer des indicateurs bruts
-(prix, revenus, gares, équipements, démographie) en une **aide à la décision**
-lisible pour un non-expert.
+HOMEPEDIA is a comprehensive solution for processing real estate and
+territorial data: ingesting multiple open data sources, performing distributed
+cleaning with Spark, and aggregating data into a queryable "Gold" layer—all
+orchestrated by Airflow and presented via a web application. The goal is to
+transform raw indicators (prices, income, train stations, amenities,
+demographics) into a **decision-support tool** that is easily understood by
+non-experts.
 
 <a id="fonctionnalites"></a>
 
-## Fonctionnalités
+## Features
 
-- **Cartographe** — choroplèthe de France coloré par un *score de correspondance*
-  personnalisé (0–100) que l'utilisateur pondère lui-même (budget / transport /
-  services / jeunes actifs), + 6 modes de lecture et un calque des gares.
-- **Fiche commune** — score détaillé, surface atteignable avec le budget saisi,
-  tendance de prix, transport, équipements, pyramide d'âge ; drill-down aux
-  arrondissements pour Paris / Lyon / Marseille.
-- **Statistiques** — 7 graphiques (prix mensuel & annuel, types de biens, profil de
-  population, services, radar de correspondance).
-- **Tableau** comparatif triable / exportable des arrondissements.
-- **Analyse textuelle** — synthèse rédigée par un moteur à règles (déterministe,
-  explicable, sans LLM).
+- **Map View** — France choropleth map colored by a custom *match score* (0–100)
+weighted by the user (budget / transport / services / young professionals),
+plus 6 viewing modes and a train station overlay.
+- **Municipality Profile** — detailed score, area accessible within the entered
+budget, price trends, transport, amenities, age demographics; drill-down to
+districts for Paris, Lyon, and Marseille.
+- **Statistics** — 7 charts (monthly & annual prices, property types, population
+profile, services, match radar chart).
+- **Comparison Table** — sortable and exportable table of districts.
+- **Textual Analysis** — summary generated by a rule-based engine
+(deterministic, explainable, no LLMs).
 
 <a id="architecture-et-donnees"></a>
 
-## Architecture et données
+## Architecture and Data
 
-Quatre **domaines** issus de sources ouvertes, agrégés dans la couche **Gold** :
+Four **domains** derived from open sources, aggregated in the **Gold** layer:
 
-| Domaine | Source | Schéma Gold |
+| Domain | Source | Gold Schema |
 |---|---|---|
-| Prix & abordabilité | DVF (Etalab) × revenus FiLoSoFi (INSEE) | `market` |
-| Démographie | Recensement INSEE | `demographics` |
-| Transport | Gares SNCF (open data) | `mobility` |
-| Services & commerces | Équipements BPE (INSEE) | `services` |
+| Price & affordability | DVF (Etalab) × FiLoSoFi income (INSEE) | `market` |
+| Demographics | INSEE census | `demographics` |
+| Transport | SNCF stations (open data) | `mobility` |
+| Services & retail | BPE facilities (INSEE) | `services` |
 
-Flux : **Bronze** (données brutes sur object store S3) → **Silver** (nettoyage &
-normalisation Spark, stocké en Parquet) → **Gold** (agrégats par commune/année
-pré-calculés dans PostgreSQL, servis par l'API).
+Pipeline: **Bronze** (raw data on S3 object store) → **Silver** (Spark cleaning &
+normalization, stored in Parquet) → **Gold** (aggregates by municipality/year
+pre-calculated in PostgreSQL, served via API).
 
 <a id="stack-technique"></a>
 
-## Stack technique
+## Technical Stack
 
-| Couche | Techno | Port local |
+| Layer | Tech | Local Port |
 |---|---|---|
 | Object store (Bronze/Silver) | MinIO (S3) | 9000 / 9001 (console) |
-| Gold relationnel + métadonnées Airflow | PostgreSQL 16 | 5432 |
+| Relational Gold + Airflow metadata | PostgreSQL 16 | 5432 |
 | Cache | Redis 7 | 6379 |
-| Moteur ETL Silver/Gold | Spark 3.5 (master + worker) | 7077 / 8090 (UI) |
+| Silver/Gold ETL engine | Spark 3.5 (master + worker) | 7077 / 8090 (UI) |
 | API | FastAPI | 8000 |
 | Frontend | Next.js 16 (App Router) | 3000 |
 | Orchestration | Airflow 2.10 (LocalExecutor) | 8080 |
-| Gouvernance (catalogue + qualité) | OpenMetadata | 8585 |
+| Governance (catalog + quality) | OpenMetadata | 8585 |
 
 <a id="demarrage-rapide"></a>
 
 ## Démarrage rapide (dev)
 
-### Prérequis
+### Prerequisites
 - Docker + Docker Compose
-- [Task](https://taskfile.dev) (`task --version`) — recommandé
-- Python 3.12 (tests/lint hors conteneur), Node ≥ 22 (frontend)
+- [Task](https://taskfile.dev) (`task --version`) — recommended
+- Python 3.12 (tests/lint outside the container), Node ≥ 22 (frontend)
 
 ### 1. Data plane + API
 
 ```bash
-task init          # crée .env depuis .env.dist
-task up            # build + démarre minio, postgres, redis, spark, api
-task airflow:up    # (optionnel) Airflow, une fois le data plane up
+task init          # creates .env from .env.dist
+task up            # builds + starts MinIO, Postgres, Redis, Spark, API
+task airflow:up    # (optional) Airflow, once the data plane is up
 ```
 
-Points d'entrée :
-- API + Swagger : http://localhost:8000/docs · Santé : `/health` · Readiness : `/ready`
-- MinIO console : http://localhost:9001 (`minioadmin` / `minioadmin`)
-- Spark master UI : http://localhost:8090
-- Airflow : http://localhost:8080 (`admin` / `admin`)
+Entry points:
+- API + Swagger: http://localhost:8000/docs · Health: `/health` · Readiness: `/ready`
+- MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`)
+- Spark master UI: http://localhost:8090
+- Airflow: http://localhost:8080 (`admin` / `admin`)
 
 ### 2. Frontend
 
 ```bash
 cd frontend
 npm install
-npm run db:migrate && npm run db:seed   # base comptes SQLite + comptes de démo
+npm run db:migrate && npm run db:seed   # SQLite base accounts + demo accounts
 npm run dev                             # http://localhost:3000
 ```
 
-Voir [frontend/README.md](frontend/README.md) pour la config (`AUTH_SECRET`,
-`NEXT_PUBLIC_API_URL`) et les comptes de démo.
+See [frontend/README.md](frontend/README.md) for configuration (`AUTH_SECRET`,
+`NEXT_PUBLIC_API_URL`) and demo accounts.
 
-### 3. Gouvernance (optionnel)
+### 3. Governance (optional)
 
 ```bash
-task openmetadata:up     # http://localhost:8585 (~6 Go RAM Docker requis)
+task openmetadata:up     # http://localhost:8585 (~6 GB Docker RAM required)
 ```
 
-### Sans Task (compose brut)
+### Without Task (raw compose)
 
 ```bash
 docker compose -f iac/docker/dev/docker-compose.yml up -d --build
@@ -147,56 +143,56 @@ docker compose -f iac/docker/dev/airflow/docker-compose.yml up -d
 
 <a id="pipelines-de-donnees"></a>
 
-## Pipelines de données
+## Data Pipelines
 
-Trois DAGs Airflow, planifiés au début de chaque mois (horaires décalés), exécutent
-Bronze → Silver → Gold pour leur domaine :
+Three Airflow DAGs, scheduled for the beginning of each month (with staggered start times), execute the
+Bronze → Silver → Gold workflow for their respective domains:
 
-| DAG | Domaine | Fichier |
+| DAG | Domain | File |
 |---|---|---|
-| `housing_etl` | Prix DVF + abordabilité (+ démographie) | [airflow/dags/housing.py](airflow/dags/housing.py) |
-| `mobility_etl` | Gares SNCF / desserte | [airflow/dags/mobility.py](airflow/dags/mobility.py) |
-| `amenities_etl` | Équipements BPE / services | [airflow/dags/amenities.py](airflow/dags/amenities.py) |
+| `housing_etl` | DVF prices + affordability (+ demographics) | [airflow/dags/housing.py](airflow/dags/housing.py) |
+| `mobility_etl` | SNCF stations / service coverage | [airflow/dags/mobility.py](airflow/dags/mobility.py) |
+| `amenities_etl` | BPE facilities / services | [airflow/dags/amenities.py](airflow/dags/amenities.py) |
 
-Les descriptions sont externalisées en Markdown dans
-[airflow/dags/config/](airflow/dags/config/). Chargement initial des sources :
-scripts de backfill dans [scripts/](scripts/).
+Descriptions are stored externally in Markdown format within
+[airflow/dags/config/](airflow/dags/config/). Initial source loading is handled by
+backfill scripts located in [scripts/](scripts/).
 
 <a id="deploiement"></a>
 
-## Déploiement (prod)
+## Deployment (prod)
 
-- **Images** : 4 images publiées sur **GHCR** par CI — `api`, `frontend`, `spark`,
-  `airflow`.
-- **VPS** (plan de service) : Caddy (HTTPS auto via nip.io), API, frontend, Redis et
-  Airflow ; réutilise un PostgreSQL Gold existant sur l'hôte.
-- **VM GCP Spark** (plan de données, à la demande) : une VM Compute Engine que
-  **Airflow démarre avant chaque run puis arrête** (maîtrise des coûts) ; elle
-  exécute `spark-submit`, lit S3 et écrit le Gold sur le VPS.
-- **CI/CD** : [.github/workflows/deploy.yml](.github/workflows/deploy.yml) construit,
-  pousse, puis met à jour le VPS (les secrets `.env.prod` / clés sont injectés en
-  base64 depuis les secrets GitHub).
+- **Images**: 4 images published to **GHCR** via CI — `api`, `frontend`, `spark`,
+`airflow`.
+- **VPS** (service plane): Caddy (automatic HTTPS via nip.io), API, frontend, Redis, and
+Airflow; reuses an existing PostgreSQL Gold instance on the host.
+- **GCP Spark VM** (data plane, on-demand): a Compute Engine VM that
+**Airflow starts before each run and stops afterwards** (cost control); it
+executes `spark-submit`, reads from S3, and writes the Gold data to the VPS.
+- **CI/CD**: [.github/workflows/deploy.yml](.github/workflows/deploy.yml) builds,
+pushes, and then updates the VPS (`.env.prod` secrets/keys are injected in
+base64 format from GitHub secrets).
 
-Détails et provisioning : [docs/hep-docs/DEPLOYMENT.md](docs/hep-docs/DEPLOYMENT.md).
+Details and provisioning: [docs/hep-docs/DEPLOYMENT.md](docs/hep-docs/DEPLOYMENT.md).
 
 <a id="structure-du-depot"></a>
 
-## Structure du dépôt
+## Repository Structure
 
 ```
-src/api/                # FastAPI (config, routers, dépendances) — sert la couche Gold
-src/data_ingestion/     # connecteurs sources → Bronze
-src/data_processing/    # ETL Spark Bronze → Silver, qualité, agrégations
-src/analytics/          # couche Gold (schémas & pipelines PostgreSQL)
-src/data_governance/    # métadonnées, qualité, sécurité
-airflow/dags/           # DAGs ETL (housing / mobility / amenities) + config .md
-frontend/               # application Next.js (carte, stats, tableau, analyse)
-iac/docker/dev/         # stack docker compose locale (data plane, Airflow, OpenMetadata)
-iac/docker/prod/        # images & compose prod (api, frontend, spark, airflow, vps, gcp-vm)
-iac/scripts/            # bootstrap (buckets S3, déploiement)
-scripts/                # backfills DVF / FiLoSoFi / BPE
-docs/hep-docs/          # documentation (déploiement, gouvernance, API, logique Silver…)
-docs/rapport/           # rapport du projet (HTML source + PDF)
+src/api/                # FastAPI (config, routers, dependencies) — serves the Gold layer
+src/data_ingestion/     # source connectors → Bronze
+src/data_processing/    # Spark ETL Bronze → Silver, quality, aggregations
+src/analytics/          # Gold layer (PostgreSQL schemas & pipelines)
+src/data_governance/    # metadata, quality, security
+airflow/dags/           # ETL DAGs (housing / mobility / amenities) + config .md
+frontend/               # Next.js application (map, stats, dashboard, analysis)
+iac/docker/dev/         # local Docker Compose stack (data plane, Airflow, OpenMetadata)
+iac/docker/prod/        # prod images & compose (api, frontend, spark, airflow, VPS, GCP VM)
+iac/scripts/            # bootstrap (S3 buckets, deployment)
+scripts/                # DVF / FiLoSoFi / BPE backfills
+docs/hep-docs/          # documentation (deployment, governance, API, Silver logic…)
+docs/rapport/           # project report (HTML source + PDF)
 tests/                  # pytest
 ```
 
@@ -216,14 +212,13 @@ task            # liste toutes les commandes
 
 ## Documentation
 
-- Déploiement & infra : [docs/hep-docs/DEPLOYMENT.md](docs/hep-docs/DEPLOYMENT.md)
-- Gouvernance des données : [docs/hep-docs/DATA_GOVERNANCE.md](docs/hep-docs/DATA_GOVERNANCE.md)
-- Référence API : [docs/hep-docs/API_REFERENCE.md](docs/hep-docs/API_REFERENCE.md)
-- Logique Silver DVF : [docs/hep-docs/silver_dvf_logic.md](docs/hep-docs/silver_dvf_logic.md)
-- Fiche ville (métriques) : [docs/hep-docs/fiche_ville.md](docs/hep-docs/fiche_ville.md)
-- Roadmap : [docs/hep-docs/ROADMAP.md](docs/hep-docs/ROADMAP.md)
-- **Rapport du projet** : [docs/rapport/rapport-du-projet.pdf](docs/rapport/rapport-du-projet.pdf)
+- Deployment & infra: [docs/hep-docs/DEPLOYMENT.md](docs/hep-docs/DEPLOYMENT.md)
+- Data governance: [docs/hep-docs/DATA_GOVERNANCE.md](docs/hep-docs/DATA_GOVERNANCE.md)
+- API reference: [docs/hep-docs/API_REFERENCE.md](docs/hep-docs/API_REFERENCE.md)
+- Silver DVF logic: [docs/hep-docs/silver_dvf_logic.md](docs/hep-docs/silver_dvf_logic.md)
+- City profile (metrics): [docs/hep-docs/fiche_ville.md](docs/hep-docs/fiche_ville.md)
+- Roadmap: [docs/hep-docs/ROADMAP.md](docs/hep-docs/ROADMAP.md)
+- **Project report**: [docs/rapport/rapport-du-projet.pdf](docs/rapport/rapport-du-projet.pdf)
 
 ---
 
-*Epitech · MSc Pro — Promotion 2026 · Projet T-DAT-902 · groupe PAR_5.*
