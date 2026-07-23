@@ -35,7 +35,7 @@ Next.js frontend.
 
 <a id="vue-densemble"></a>
 
-## Vue d'ensemble
+## Overview
 
 HOMEPEDIA is a comprehensive solution for processing real estate and
 territorial data: ingesting multiple open data sources, performing distributed
